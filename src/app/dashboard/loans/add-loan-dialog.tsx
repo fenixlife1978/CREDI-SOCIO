@@ -26,7 +26,6 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
@@ -103,7 +102,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
         numberOfInstallments: loanToEdit.numberOfInstallments,
         startDate: format(parseISO(loanToEdit.startDate), 'yyyy-MM-dd'),
         // Note: custom loan fields might need to be added here if they exist on the loan object
-        fixedInterestAmount: 0, // Assuming default, adjust if stored
+        fixedInterestAmount: loanToEdit.fixedInterestAmount ?? 0, // Assuming default, adjust if stored
         hasTerm: 'yes', // Assuming default, adjust if stored
       });
     } else {
@@ -142,6 +141,11 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
             numberOfInstallments: data.numberOfInstallments ?? 0,
             interestRate: data.interestRate ?? 0,
         };
+
+        if (data.loanType === 'custom') {
+            loanData.fixedInterestAmount = data.fixedInterestAmount;
+        }
+
         await updateDoc(loanDocRef, loanData);
         toast({
             title: '¡Éxito!',
@@ -165,6 +169,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
           status: 'Active',
           numberOfInstallments: data.numberOfInstallments ?? 0,
           interestRate: data.interestRate ?? 0,
+          fixedInterestAmount: data.loanType === 'custom' ? data.fixedInterestAmount : undefined,
         };
         batch.set(loanDocRef, loanData);
     
@@ -384,7 +389,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
                     <FormItem>
                       <FormLabel>Monto de Interés Fijo (por cuota)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} disabled={isEditMode} />
+                        <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

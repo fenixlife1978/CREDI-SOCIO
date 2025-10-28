@@ -24,6 +24,7 @@ export type Loan = {
   
   // Optional: For displaying partner info directly on the loan
   partnerName?: string; 
+  fixedInterestAmount?: number;
 };
 
 export type Payment = {
