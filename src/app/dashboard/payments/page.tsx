@@ -9,9 +9,14 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { Payment } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function PaymentsPage() {
     const firestore = useFirestore();
+    const router = useRouter();
+    
     const paymentsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'payments'));
@@ -19,22 +24,27 @@ export default function PaymentsPage() {
     
     const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
     
-    const currencyFormatter = new Intl.NumberFormat('en-US', {
+    const currencyFormatter = new Intl.NumberFormat('es-CO', {
         style: 'currency',
-        currency: 'USD',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
     });
 
-    const dateFormatter = new Intl.DateTimeFormat('es-ES', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
+    const dateFormatter = (dateString: string) => {
+        if (!dateString) return "-";
+        try {
+          return format(parseISO(dateString), "d 'de' LLLL 'de' yyyy", { locale: es });
+        } catch (error) {
+          return "Fecha inválida";
+        }
+    };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Pagos</h1>
-        <Button className="ml-auto" size="sm">
+        <Button className="ml-auto" size="sm" onClick={() => router.push('/dashboard/payments/register')}>
           <PlusCircle className="h-4 w-4 mr-2" />
           Registrar Pago
         </Button>
@@ -77,7 +87,7 @@ export default function PaymentsPage() {
                   <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
                   <TableCell>{payment.loanId}</TableCell>
                   <TableCell>{currencyFormatter.format(payment.totalAmount)}</TableCell>
-                  <TableCell className="hidden md:table-cell">{dateFormatter.format(new Date(payment.paymentDate))}</TableCell>
+                  <TableCell className="hidden md:table-cell">{dateFormatter(payment.paymentDate)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

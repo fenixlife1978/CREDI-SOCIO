@@ -28,7 +28,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/partners', label: 'Socios', icon: Users },
   { href: '/dashboard/loans', label: 'Préstamos', icon: Landmark },
-  { href: '/dashboard/payments', label: 'Pagos', icon: DollarSign },
+  { href: '/dashboard/payments/register', label: 'Pagos', icon: DollarSign },
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldAlert },
 ];
 
@@ -72,7 +72,7 @@ export function AppSidebar() {
               <SidebarMenuButton
                 asChild
                 href={item.href}
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
                 icon={<item.icon />}
                 tooltip={{
                   children: item.label,
