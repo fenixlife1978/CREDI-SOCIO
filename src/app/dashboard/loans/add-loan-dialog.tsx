@@ -52,7 +52,7 @@ const loanSchema = z.object({
   fixedInterestAmount: z.coerce.number().min(0, 'El monto de interés no puede ser negativo.').optional(),
   hasTerm: z.enum(['yes', 'no']).optional(),
   startDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-    message: 'La fecha de inicio es inválida.',
+    message: 'La fecha de otorgamiento es inválida.',
   }),
 }).refine(data => {
   if (data.loanType === 'standard') {
@@ -363,7 +363,7 @@ export function AddLoanDialog() {
               name="startDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fecha de Inicio</FormLabel>
+                  <FormLabel>Fecha de Otorgamiento</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
