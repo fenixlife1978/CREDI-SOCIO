@@ -1,32 +1,41 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal, Trash2, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, doc, deleteDoc } from "firebase/firestore";
-import type { Loan } from "@/lib/data";
+import { collection, query, doc, deleteDoc, writeBatch } from "firebase/firestore";
+import type { Loan, Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AddLoanDialog } from "./add-loan-dialog";
+import * as XLSX from 'xlsx';
 
 export default function LoansPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const loansQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'loans'));
   }, [firestore]);
 
-  const { data: loans, isLoading } = useCollection<Loan>(loansQuery);
+  const partnersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'partners'));
+  }, [firestore]);
+
+  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
+  const { data: partners, isLoading: partnersLoading } = useCollection<Partner>(partnersQuery);
 
   const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -60,12 +69,130 @@ export default function LoansPage() {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !firestore || !partners) return;
+
+    setIsImporting(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        if (json.length === 0) {
+          throw new Error("El archivo de Excel está vacío o no tiene el formato correcto.");
+        }
+
+        const batch = writeBatch(firestore);
+        const loansCollectionRef = collection(firestore, 'loans');
+        let importedCount = 0;
+        let failedCount = 0;
+
+        json.forEach(row => {
+          const partnerName = row['Socio'];
+          const partner = partners.find(p => `${p.firstName} ${p.lastName}` === partnerName);
+
+          if (partner) {
+            const newLoanDocRef = doc(loansCollectionRef);
+            
+            // Excel dates are numbers, need conversion
+            let startDate = new Date().toISOString();
+            if(row['Fecha de otorgamiento']){
+                if(typeof row['Fecha de otorgamiento'] === 'number') {
+                    // It's an Excel date serial number
+                    startDate = new Date(Math.round((row['Fecha de otorgamiento'] - 25569) * 864e5)).toISOString();
+                } else if(typeof row['Fecha de otorgamiento'] === 'string') {
+                    // Assume it's a parseable date string
+                    startDate = new Date(row['Fecha de otorgamiento']).toISOString();
+                }
+            }
+            
+            const newLoanData = {
+              partnerId: partner.id,
+              partnerName: partnerName,
+              startDate: startDate,
+              totalAmount: parseFloat(row['Monto Original'] || 0),
+              loanType: (row['Tipo de Préstamo'] || 'standard').toLowerCase(),
+              numberOfInstallments: parseInt(row['Plazo (cuotas)'] || 0, 10),
+              interestRate: parseFloat(row['Interés'] || 0),
+              status: row['Estado'] || 'Active',
+            };
+            batch.set(newLoanDocRef, newLoanData);
+            importedCount++;
+          } else {
+            failedCount++;
+          }
+        });
+        
+        if (importedCount === 0 && failedCount > 0) {
+            throw new Error(`No se pudo importar ningún préstamo. ${failedCount} fila(s) no tenían un socio coincidente.`);
+        }
+
+        await batch.commit();
+
+        let description = `${importedCount} préstamo(s) importado(s) correctamente.`;
+        if (failedCount > 0) {
+            description += ` ${failedCount} fila(s) fueron omitidas por no encontrar al socio.`;
+        }
+
+        toast({
+          title: "Éxito Parcial o Total",
+          description: description,
+        });
+
+      } catch (error: any) {
+        console.error("Error importing loans:", error);
+        toast({
+          title: "Error al importar",
+          description: error.message || "No se pudo procesar el archivo de Excel.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Error",
+        description: "No se pudo leer el archivo.",
+        variant: "destructive",
+      });
+      setIsImporting(false);
+    };
+    reader.readAsBinaryString(file);
+  };
+  
+  const isLoading = loansLoading || partnersLoading;
+
   return (
     <>
       <div className="flex flex-col gap-6">
         <div className="flex items-center">
           <h1 className="font-semibold text-lg md:text-2xl">Préstamos</h1>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              accept=".xlsx, .xls, .csv"
+            />
+            <Button variant="outline" size="sm" onClick={handleImportClick} disabled={isImporting}>
+              <Upload className="h-4 w-4 mr-2" />
+              {isImporting ? 'Importando...' : 'Importar'}
+            </Button>
             <AddLoanDialog />
           </div>
         </div>
