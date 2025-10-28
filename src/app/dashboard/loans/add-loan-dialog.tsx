@@ -34,11 +34,11 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PlusCircle, Loader, Check, ChevronsUpDown } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, addDoc, writeBatch, doc } from 'firebase/firestore';
 import type { Partner, Loan } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const loanSchema = z.object({
@@ -102,30 +102,71 @@ export function AddLoanDialog() {
   const onSubmit = async (data: LoanFormData) => {
     if (!firestore) return;
     setIsSubmitting(true);
-
+  
     try {
       const selectedPartner = partners?.find(p => p.id === data.partnerId);
+      const batch = writeBatch(firestore);
+  
+      // 1. Create Loan Document
+      const loanCollectionRef = collection(firestore, 'loans');
+      const loanDocRef = doc(loanCollectionRef);
       
-      const loanData: Omit<Loan, 'id' | 'status'> = {
+      const loanData: Omit<Loan, 'id'> = {
         partnerId: data.partnerId,
         loanType: data.loanType,
         totalAmount: data.totalAmount,
         startDate: new Date(data.startDate).toISOString(),
         partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
-        interestRate: data.interestRate ?? 0,
-        numberOfInstallments: data.numberOfInstallments ?? 0,
-      };
-
-      await addDoc(collection(firestore, 'loans'), {
-        ...loanData,
         status: 'Active',
-      });
+        numberOfInstallments: data.numberOfInstallments ?? 0,
+        interestRate: data.interestRate ?? 0,
+      };
+      batch.set(loanDocRef, loanData);
+  
+      // 2. Create Installment Documents if applicable
+      const installmentsRef = collection(firestore, 'installments');
+      const termDuration = data.loanType === 'standard' || (data.loanType === 'custom' && data.hasTerm === 'yes') 
+        ? data.numberOfInstallments
+        : 0;
 
+      if (termDuration && termDuration > 0) {
+        const capitalPerInstallment = data.totalAmount / termDuration;
+        let interestPerInstallment = 0;
+
+        if(data.loanType === 'standard'){
+            interestPerInstallment = data.totalAmount * ((data.interestRate || 0) / 100);
+        } else { // custom
+            interestPerInstallment = data.fixedInterestAmount || 0;
+        }
+
+        const totalPerInstallment = capitalPerInstallment + interestPerInstallment;
+        const startDate = new Date(data.startDate);
+
+        for (let i = 1; i <= termDuration; i++) {
+          const installmentDocRef = doc(installmentsRef);
+          const dueDate = addMonths(startDate, i);
+          
+          batch.set(installmentDocRef, {
+            loanId: loanDocRef.id,
+            partnerId: data.partnerId,
+            installmentNumber: i,
+            dueDate: dueDate.toISOString(),
+            status: 'pending',
+            capitalAmount: capitalPerInstallment,
+            interestAmount: interestPerInstallment,
+            totalAmount: totalPerInstallment,
+          });
+        }
+      }
+      // For custom loans without a term, no installments are pre-generated.
+  
+      await batch.commit();
+  
       toast({
         title: '¡Éxito!',
-        description: 'El préstamo ha sido añadido correctamente.',
+        description: 'El préstamo y sus cuotas han sido añadidos correctamente.',
       });
-
+  
       form.reset();
       setOpen(false);
     } catch (error) {
@@ -302,7 +343,7 @@ export function AddLoanDialog() {
                   name="fixedInterestAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monto de Interés Fijo</FormLabel>
+                      <FormLabel>Monto de Interés Fijo (por cuota)</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} />
                       </FormControl>

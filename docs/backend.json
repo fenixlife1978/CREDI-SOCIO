@@ -63,7 +63,7 @@
         },
         "loanType": {
           "type": "string",
-          "description": "The type of loan (e.g., Standard, Personalizado)."
+          "description": "The type of loan (e.g., Standard, Custom)."
         },
         "totalAmount": {
           "type": "number",
@@ -107,6 +107,10 @@
           "type": "string",
           "description": "Reference to Loan. (Relationship: Loan 1:N Installment)"
         },
+        "partnerId": {
+          "type": "string",
+          "description": "Reference to Partner. (Relationship: Partner 1:N Installment)"
+        },
         "installmentNumber": {
           "type": "number",
           "description": "The installment number (e.g., 1, 2, 3)."
@@ -123,7 +127,7 @@
         },
         "status": {
           "type": "string",
-          "description": "The status of the installment (e.g., pending, paid)."
+          "description": "The status of the installment (e.g., pending, paid, overdue)."
         },
         "capitalAmount": {
           "type": "number",
@@ -132,16 +136,22 @@
         "interestAmount": {
           "type": "number",
           "description": "The interest amount for the installment."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount for the installment (capital + interest)."
         }
       },
       "required": [
         "id",
         "loanId",
+        "partnerId",
         "installmentNumber",
         "dueDate",
         "status",
         "capitalAmount",
-        "interestAmount"
+        "interestAmount",
+        "totalAmount"
       ]
     },
     "Payment": {
@@ -342,7 +352,7 @@
           "schema": {
             "$ref": "#/backend/entities/Installment"
           },
-          "description": "Stores installment information associated with a loan."
+          "description": "Stores installment information associated with a loan. This collection can be a subcollection of loans for better data organization, e.g., /loans/{loanId}/installments/{installmentId}."
         }
       },
       {
@@ -386,6 +396,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed for public access, as authentication is handled by a simple PIN at the application level. Collections are placed at the root level to simplify security rules, allowing open read/write access. This model is suitable for an internal tool where all users are trusted and no granular user-based permissions are required."
+    "reasoning": "The Firestore structure is designed for public access, as authentication is handled by a simple PIN at the application level. Collections are placed at the root level to simplify security rules, allowing open read/write access. Subcollections might be used for installments under loans for better data integrity. This model is suitable for an internal tool where all users are trusted and no granular user-based permissions are required."
   }
 }

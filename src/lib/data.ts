@@ -39,14 +39,16 @@ export type Payment = {
 };
 
 export type Installment = {
-  id: string;
+  id: string; // Document ID from Firestore
   loanId: string;
+  partnerId: string;
   installmentNumber: number;
   dueDate: string; // ISO string
   paymentDate?: string; // ISO string
-  status: 'pending' | 'paid';
+  status: 'pending' | 'paid' | 'overdue';
   capitalAmount: number;
   interestAmount: number;
+  totalAmount: number;
 }
 
 
