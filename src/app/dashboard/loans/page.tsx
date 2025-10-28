@@ -46,6 +46,7 @@ export default function LoansPage() {
 
   const sortedLoans = useMemo(() => {
     if (!loans) return [];
+    // No filtering here, just sorting. All loans will be displayed.
     return [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [loans]);
 
@@ -114,12 +115,14 @@ export default function LoansPage() {
   };
 
   const handleClearAllConfirm = async () => {
-    if (!firestore) return;
+    if (!firestore || !loans) return;
     try {
       const batch = writeBatch(firestore);
-      const loansToDelete = loans?.filter(loan => loan.partnerName !== 'ALEXANDER BRICEÑO');
+      
+      // The filtering logic is ONLY here, for the delete action.
+      const loansToDelete = loans.filter(loan => loan.partnerName !== 'ALEXANDER BRICEÑO');
 
-      if (!loansToDelete || loansToDelete.length === 0) {
+      if (loansToDelete.length === 0) {
         toast({
           title: 'Nada que eliminar',
           description: 'No hay préstamos para eliminar (excepto el de ALEXANDER BRICEÑO).',
