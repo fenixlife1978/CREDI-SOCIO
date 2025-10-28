@@ -310,7 +310,6 @@
   },
   "auth": {
     "providers": [
-      "password",
       "anonymous"
     ]
   },
@@ -323,101 +322,47 @@
           "schema": {
             "$ref": "#/backend/entities/Partner"
           },
-          "description": "Stores partner information. Each document represents a partner in the lending system.",
-          "params": [
-            {
-              "name": "partnerId",
-              "description": "The unique identifier of the partner."
-            }
-          ]
+          "description": "Stores partner information. Each document represents a partner in the lending system."
         }
       },
       {
-        "path": "/partners/{partnerId}/loans/{loanId}",
+        "path": "/loans/{loanId}",
         "definition": {
           "entityName": "Loan",
           "schema": {
             "$ref": "#/backend/entities/Loan"
           },
-          "description": "Stores loan information associated with a partner.  The 'partnerId' field is denormalized from the parent partner document to enforce authorization independence. This path enables secure list operations.",
-          "params": [
-            {
-              "name": "partnerId",
-              "description": "The unique identifier of the partner."
-            },
-            {
-              "name": "loanId",
-              "description": "The unique identifier of the loan."
-            }
-          ]
+          "description": "Stores loan information associated with a partner."
         }
       },
       {
-        "path": "/partners/{partnerId}/loans/{loanId}/installments/{installmentId}",
+        "path": "/installments/{installmentId}",
         "definition": {
           "entityName": "Installment",
           "schema": {
             "$ref": "#/backend/entities/Installment"
           },
-          "description": "Stores installment information associated with a loan. The 'partnerId' and 'loanId' fields are denormalized from the parent partner and loan documents respectively to enforce authorization independence.  This path enables secure list operations.",
-          "params": [
-            {
-              "name": "partnerId",
-              "description": "The unique identifier of the partner."
-            },
-            {
-              "name": "loanId",
-              "description": "The unique identifier of the loan."
-            },
-            {
-              "name": "installmentId",
-              "description": "The unique identifier of the installment."
-            }
-          ]
+          "description": "Stores installment information associated with a loan."
         }
       },
       {
-        "path": "/partners/{partnerId}/payments/{paymentId}",
+        "path": "/payments/{paymentId}",
         "definition": {
           "entityName": "Payment",
           "schema": {
             "$ref": "#/backend/entities/Payment"
           },
-          "description": "Stores payment information associated with a partner.  The 'partnerId' field is denormalized from the parent partner document to enforce authorization independence. This path enables secure list operations.",
-          "params": [
-            {
-              "name": "partnerId",
-              "description": "The unique identifier of the partner."
-            },
-            {
-              "name": "paymentId",
-              "description": "The unique identifier of the payment."
-            }
-          ]
+          "description": "Stores payment information associated with a partner."
         }
       },
       {
-        "path": "/partners/{partnerId}/payments/{paymentId}/receipts/{receiptId}",
+        "path": "/receipts/{receiptId}",
         "definition": {
           "entityName": "Receipt",
           "schema": {
             "$ref": "#/backend/entities/Receipt"
           },
-          "description": "Stores receipt information associated with a payment.  The 'partnerId' and 'paymentId' fields are denormalized from the parent partner and payment documents respectively to enforce authorization independence. This path enables secure list operations.",
-          "params": [
-            {
-              "name": "partnerId",
-              "description": "The unique identifier of the partner."
-            },
-            {
-              "name": "paymentId",
-              "description": "The unique identifier of the payment."
-            },
-            {
-              "name": "receiptId",
-              "description": "The unique identifier of the receipt."
-            }
-          ]
+          "description": "Stores receipt information associated with a payment."
         }
       },
       {
@@ -427,13 +372,7 @@
           "schema": {
             "$ref": "#/backend/entities/Report"
           },
-          "description": "Stores financial report data.",
-          "params": [
-            {
-              "name": "reportId",
-              "description": "The unique identifier of the report."
-            }
-          ]
+          "description": "Stores financial report data."
         }
       },
       {
@@ -443,16 +382,10 @@
           "schema": {
             "$ref": "#/backend/entities/Anomaly"
           },
-          "description": "Stores anomaly detection data.",
-          "params": [
-            {
-              "name": "anomalyId",
-              "description": "The unique identifier of the anomaly."
-            }
-          ]
+          "description": "Stores anomaly detection data."
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to manage partners, loans, installments, payments, receipts, reports, and anomaly detections for the CrediManage application. It leverages path-based ownership for partner-related data and subcollections to represent one-to-many relationships (e.g., Partner to Loans, Loan to Installments). This structure ensures authorization independence by avoiding hierarchical authorization dependencies and facilitates simple, robust, and easily debuggable security rules.  Specifically, the loan, installment, payment, and receipt documents are nested under the partner document.  This enables simple security rules for access control (e.g. only the partner can see their loans, etc.). This ensures that all documents within the collection have the same security requirements.  QAPs are supported through structural segregation.  The nested structure allows for efficient querying of related data and simplifies the implementation of security rules based on ownership."
+    "reasoning": "The Firestore structure is designed for public access, as authentication is handled by a simple PIN at the application level. Collections are placed at the root level to simplify security rules, allowing open read/write access. This model is suitable for an internal tool where all users are trusted and no granular user-based permissions are required."
   }
 }
