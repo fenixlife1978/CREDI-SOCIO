@@ -189,7 +189,7 @@ export function AddLoanDialog() {
           Añadir Préstamo
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Añadir Nuevo Préstamo</DialogTitle>
           <DialogDescription>
