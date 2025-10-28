@@ -15,7 +15,7 @@ export type Partner = {
 export type Loan = {
   id: string; // Document ID from Firestore
   partnerId: string; // Reference to the partner
-  loanType: string;
+  loanType: 'standard' | 'custom';
   totalAmount: number;
   numberOfInstallments: number;
   interestRate: number;
