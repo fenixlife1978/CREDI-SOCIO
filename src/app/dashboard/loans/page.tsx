@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,6 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AddLoanDialog } from "./add-loan-dialog";
 import * as XLSX from 'xlsx';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function LoansPage() {
   const firestore = useFirestore();
@@ -37,10 +39,25 @@ export default function LoansPage() {
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: partners, isLoading: partnersLoading } = useCollection<Partner>(partnersQuery);
 
-  const currencyFormatter = new Intl.NumberFormat('en-US', {
+  const sortedLoans = useMemo(() => {
+    if (!loans) return [];
+    return [...loans].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }, [loans]);
+
+  const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
+
+  const dateFormatter = (dateString: string) => {
+    try {
+      return format(parseISO(dateString), "d 'de' LLLL 'de' yyyy", { locale: es });
+    } catch (error) {
+      return "Fecha inválida";
+    }
+  };
 
   const openDeleteDialog = (loan: Loan) => {
     setLoanToDelete(loan);
@@ -227,6 +244,7 @@ export default function LoansPage() {
                 <TableRow>
                   <TableHead>Socio</TableHead>
                   <TableHead>Monto Total</TableHead>
+                  <TableHead>Fecha de Otorgamiento</TableHead>
                   <TableHead className="hidden md:table-cell">Cuotas</TableHead>
                   <TableHead className="hidden md:table-cell">Interés</TableHead>
                   <TableHead>Estado</TableHead>
@@ -241,6 +259,7 @@ export default function LoansPage() {
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
@@ -248,10 +267,11 @@ export default function LoansPage() {
                     </TableRow>
                   ))
                 )}
-                {!isLoading && loans?.map((loan) => (
+                {!isLoading && sortedLoans.map((loan) => (
                   <TableRow key={loan.id}>
                     <TableCell className="font-medium">{loan.partnerName || loan.partnerId}</TableCell>
                     <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>
+                    <TableCell>{dateFormatter(loan.startDate)}</TableCell>
                     <TableCell className="hidden md:table-cell">{!isNaN(loan.numberOfInstallments) ? loan.numberOfInstallments : '-'}</TableCell>
                     <TableCell className="hidden md:table-cell">{!isNaN(loan.interestRate) ? `${loan.interestRate}%` : '-'}</TableCell>
                     <TableCell>
@@ -283,9 +303,9 @@ export default function LoansPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {!isLoading && loans?.length === 0 && (
+                {!isLoading && sortedLoans.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                       No se encontraron préstamos.
                     </TableCell>
                   </TableRow>
