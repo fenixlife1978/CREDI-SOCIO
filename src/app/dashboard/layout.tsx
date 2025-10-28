@@ -5,7 +5,7 @@ import { AppHeader } from '@/components/layout/header';
 import { useAuth } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider } from '@/firebase/client-provider-no-auth';
 
 export default function DashboardLayout({
   children,
