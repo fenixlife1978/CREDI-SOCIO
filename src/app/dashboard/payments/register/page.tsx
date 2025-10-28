@@ -8,7 +8,7 @@ import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,6 +51,18 @@ export default function RegisterPaymentPage() {
       return getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear;
     });
   }, [installments, selectedMonth, selectedYear]);
+
+  const totals = useMemo(() => {
+    return filteredInstallments.reduce(
+      (acc, inst) => {
+        acc.capital += inst.capitalAmount;
+        acc.interest += inst.interestAmount;
+        acc.total += inst.totalAmount;
+        return acc;
+      },
+      { capital: 0, interest: 0, total: 0 }
+    );
+  }, [filteredInstallments]);
 
   const handleSelectAll = (checked: boolean) => {
     const newSelection: Record<string, boolean> = {};
@@ -125,13 +137,15 @@ export default function RegisterPaymentPage() {
                   <TableHead padding="checkbox" className="w-12">
                     <Checkbox
                       onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
-                      checked={filteredInstallments.length > 0 && Object.keys(selectedInstallments).length === filteredInstallments.length}
+                      checked={filteredInstallments.length > 0 && Object.keys(selectedInstallments).length === filteredInstallments.length && Object.values(selectedInstallments).every(v => v)}
                     />
                   </TableHead>
                   <TableHead>Socio</TableHead>
                   <TableHead># Cuota</TableHead>
                   <TableHead>Fecha Vencimiento</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="text-right">Capital</TableHead>
+                  <TableHead className="text-right">Interés</TableHead>
+                  <TableHead className="text-right">Monto Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -141,7 +155,9 @@ export default function RegisterPaymentPage() {
                       <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
                     </TableRow>
                   ))
@@ -160,17 +176,29 @@ export default function RegisterPaymentPage() {
                     <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || 'Socio no encontrado'}</TableCell>
                     <TableCell>{installment.installmentNumber}</TableCell>
                     <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="text-right">{currencyFormatter.format(installment.totalAmount)}</TableCell>
+                    <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
+                    <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
+                    <TableCell className="text-right font-medium">{currencyFormatter.format(installment.totalAmount)}</TableCell>
                   </TableRow>
                 ))}
                 {!isLoading && filteredInstallments.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                       No hay cuotas pendientes para el período seleccionado.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
+              {!isLoading && filteredInstallments.length > 0 && (
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={4} className="font-bold">Totales</TableCell>
+                    <TableCell className="text-right font-bold">{currencyFormatter.format(totals.capital)}</TableCell>
+                    <TableCell className="text-right font-bold">{currencyFormatter.format(totals.interest)}</TableCell>
+                    <TableCell className="text-right font-bold">{currencyFormatter.format(totals.total)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              )}
             </Table>
           </div>
         </CardContent>
