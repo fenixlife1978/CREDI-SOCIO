@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Trash2 } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
@@ -13,6 +13,7 @@ import { collection, query, doc, deleteDoc } from "firebase/firestore";
 import type { Loan } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { AddLoanDialog } from "./add-loan-dialog";
 
 export default function LoansPage() {
   const firestore = useFirestore();
@@ -64,10 +65,9 @@ export default function LoansPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center">
           <h1 className="font-semibold text-lg md:text-2xl">Préstamos</h1>
-          <Button className="ml-auto" size="sm">
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Añadir Préstamo
-          </Button>
+          <div className="ml-auto">
+            <AddLoanDialog />
+          </div>
         </div>
 
         <Card>
