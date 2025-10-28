@@ -102,15 +102,14 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
         interestRate: loanToEdit.interestRate,
         numberOfInstallments: loanToEdit.numberOfInstallments,
         startDate: format(parseISO(loanToEdit.startDate), 'yyyy-MM-dd'),
-        // Note: custom loan fields might need to be added here if they exist on the loan object
-        fixedInterestAmount: loanToEdit.fixedInterestAmount ?? 0, // Assuming default, adjust if stored
-        hasTerm: 'yes', // Assuming default, adjust if stored
+        fixedInterestAmount: loanToEdit.fixedInterestAmount ?? 0,
+        hasTerm: loanToEdit.numberOfInstallments > 0 ? 'yes' : 'no',
       });
     } else {
       form.reset({
         loanType: 'standard',
         totalAmount: 0,
-        interestRate: 0,
+        interestRate: 5, // Default interest rate to 5% for new standard loans
         numberOfInstallments: 1,
         fixedInterestAmount: 0,
         hasTerm: 'yes',

@@ -162,6 +162,17 @@ export default function LoansPage() {
                     }
                 }
             }
+
+            const getInterestRate = () => {
+              const interestKeys = ['Interés', 'interes', 'tasa', 'Tasa de Interés'];
+              for (const key of interestKeys) {
+                if (row[key] !== undefined) {
+                  const rate = parseFloat(row[key]);
+                  return isNaN(rate) ? 0 : rate;
+                }
+              }
+              return 0;
+            };
             
             const loanData = {
               partnerId: partner.id,
@@ -170,7 +181,7 @@ export default function LoansPage() {
               totalAmount: parseFloat(row['Monto Original'] || 0),
               loanType: (row['Tipo de Préstamo'] || 'standard').toLowerCase() as 'standard' | 'custom',
               numberOfInstallments: parseInt(row['Plazo (cuotas)'] || '0', 10),
-              interestRate: parseFloat(row['Interés'] || '0'),
+              interestRate: getInterestRate(),
               fixedInterestAmount: parseFloat(row['Interes Fijo'] || '0'),
               status: row['Estado'] || 'Active',
             };
