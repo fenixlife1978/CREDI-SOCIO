@@ -239,79 +239,81 @@ export default function LoansPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Socio</TableHead>
-                  <TableHead>Monto Total</TableHead>
-                  <TableHead>Fecha de Otorgamiento</TableHead>
-                  <TableHead className="hidden md:table-cell">Cuotas</TableHead>
-                  <TableHead className="hidden md:table-cell">Interés</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
-                    </TableRow>
-                  ))
-                )}
-                {!isLoading && sortedLoans.map((loan) => (
-                  <TableRow key={loan.id}>
-                    <TableCell className="font-medium">{loan.partnerName || loan.partnerId}</TableCell>
-                    <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>
-                    <TableCell>{dateFormatter(loan.startDate)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{!isNaN(loan.numberOfInstallments) ? loan.numberOfInstallments : '-'}</TableCell>
-                    <TableCell className="hidden md:table-cell">{!isNaN(loan.interestRate) ? `${loan.interestRate}%` : '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={loan.status === 'Paid Off' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
-                        {loan.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => openDeleteDialog(loan)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!isLoading && sortedLoans.length === 0 && (
+            <div className="relative w-full overflow-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                      No se encontraron préstamos.
-                    </TableCell>
+                    <TableHead>Socio</TableHead>
+                    <TableHead>Monto Total</TableHead>
+                    <TableHead>Fecha de Otorgamiento</TableHead>
+                    <TableHead className="hidden md:table-cell">Cuotas</TableHead>
+                    <TableHead className="hidden md:table-cell">Interés</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {isLoading && (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                  {!isLoading && sortedLoans.map((loan) => (
+                    <TableRow key={loan.id}>
+                      <TableCell className="font-medium">{loan.partnerName || loan.partnerId}</TableCell>
+                      <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>
+                      <TableCell>{dateFormatter(loan.startDate)}</TableCell>
+                      <TableCell className="hidden md:table-cell">{!isNaN(loan.numberOfInstallments) ? loan.numberOfInstallments : '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{!isNaN(loan.interestRate) ? `${loan.interestRate}%` : '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant={loan.status === 'Paid Off' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
+                          {loan.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Toggle menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => openDeleteDialog(loan)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!isLoading && sortedLoans.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No se encontraron préstamos.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -333,3 +335,5 @@ export default function LoansPage() {
     </>
   );
 }
+
+    
