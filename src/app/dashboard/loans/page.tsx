@@ -104,15 +104,32 @@ export default function LoansPage() {
           if (partner) {
             const newLoanDocRef = doc(loansCollectionRef);
             
-            // Excel dates are numbers, need conversion
             let startDate = new Date().toISOString();
-            if(row['Fecha de otorgamiento']){
-                if(typeof row['Fecha de otorgamiento'] === 'number') {
+            const excelDate = row['Fecha de otorgamiento'];
+
+            if(excelDate){
+                if(typeof excelDate === 'number') {
                     // It's an Excel date serial number
-                    startDate = new Date(Math.round((row['Fecha de otorgamiento'] - 25569) * 864e5)).toISOString();
-                } else if(typeof row['Fecha de otorgamiento'] === 'string') {
-                    // Assume it's a parseable date string
-                    startDate = new Date(row['Fecha de otorgamiento']).toISOString();
+                    startDate = new Date(Math.round((excelDate - 25569) * 864e5)).toISOString();
+                } else if(typeof excelDate === 'string') {
+                    // Handle string dates, like 'DD/MM/YYYY'
+                    const parts = excelDate.split('/');
+                    if (parts.length === 3) {
+                      // Assuming DD/MM/YYYY
+                      const day = parseInt(parts[0], 10);
+                      const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                      const year = parseInt(parts[2], 10);
+                      const date = new Date(year, month, day);
+                      if (!isNaN(date.getTime())) {
+                          startDate = date.toISOString();
+                      }
+                    } else {
+                        // Try to parse it directly if not in D/M/Y format
+                        const date = new Date(excelDate);
+                        if (!isNaN(date.getTime())) {
+                            startDate = date.toISOString();
+                        }
+                    }
                 }
             }
             
