@@ -17,10 +17,12 @@ import { AddLoanDialog } from "./add-loan-dialog";
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useRouter } from "next/navigation";
 
 export default function LoansPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
@@ -43,7 +45,7 @@ export default function LoansPage() {
 
   const sortedLoans = useMemo(() => {
     if (!loans) return [];
-    return [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    return [...loans].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   }, [loans]);
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
@@ -312,7 +314,7 @@ export default function LoansPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/loans/${loan.id}`)}>Ver Detalles</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(loan)}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Editar
