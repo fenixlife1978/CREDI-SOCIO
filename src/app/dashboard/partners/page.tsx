@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MoreHorizontal, PlusCircle, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, addDoc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, query, doc, writeBatch } from "firebase/firestore";
 import type { Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
@@ -50,6 +50,7 @@ export default function PartnersPage() {
         }
         
         const batch = writeBatch(firestore);
+        const partnersCollectionRef = collection(firestore, 'partners');
         let importedCount = 0;
 
         json.forEach(row => {
@@ -57,7 +58,7 @@ export default function PartnersPage() {
           const lastName = row['Apellido'] || row['apellido'];
           
           if (firstName && lastName) {
-            const partnerRef = collection(firestore, 'partners');
+            const newPartnerDocRef = doc(partnersCollectionRef);
             const newPartnerDoc = {
               firstName: String(firstName),
               lastName: String(lastName),
@@ -65,7 +66,7 @@ export default function PartnersPage() {
               alias: String(row['Alias'] || ''),
               // createdAt: serverTimestamp(), // Opcional
             };
-            batch.set(addDoc(partnerRef, newPartnerDoc).parent.doc(), newPartnerDoc);
+            batch.set(newPartnerDocRef, newPartnerDoc);
             importedCount++;
           }
         });
