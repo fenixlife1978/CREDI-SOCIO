@@ -1,21 +1,46 @@
+'use client';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/sidebar';
 import { AppHeader } from '@/components/layout/header';
+import { useAuth } from '@/lib/auth-provider';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
+import { initializeFirebase, FirebaseProvider } from '@/firebase';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  const { firebaseApp, auth, firestore } = useMemo(
+    () => initializeFirebase(),
+    []
+  );
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/lock');
+    }
+  }, [isAuthenticated, router]);
+
+  if (!isAuthenticated) {
+    return null; // O un componente de carga
+  }
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <AppHeader />
-        <main className="flex-1 p-4 sm:p-6 bg-background">
-          {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <FirebaseProvider firebaseApp={firebaseApp} auth={auth} firestore={firestore}>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <AppHeader />
+          <main className="flex-1 p-4 sm:p-6 bg-background">
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </FirebaseProvider>
   );
 }

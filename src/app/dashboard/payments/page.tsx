@@ -1,11 +1,21 @@
+'use client';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { mockPayments } from "@/lib/data";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useFirestore } from "@/firebase";
+import { collection, query } from "firebase/firestore";
+import type { Payment } from "@/lib/data";
 
 export default function PaymentsPage() {
+    const firestore = useFirestore();
+    const { data: payments, isLoading } = useCollection<Payment>(
+        firestore ? query(collection(firestore, 'payments')) : null
+    );
+    
     const currencyFormatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
@@ -16,6 +26,10 @@ export default function PaymentsPage() {
         month: 'long',
         day: 'numeric',
     });
+
+    if (isLoading) {
+        return <div>Cargando pagos...</div>
+    }
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,7 +63,7 @@ export default function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockPayments.map((payment) => (
+              {payments?.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell className="font-medium">{payment.partnerName}</TableCell>
                   <TableCell>{payment.loanId}</TableCell>

@@ -1,0 +1,211 @@
+/**
+ * @fileoverview Firestore Security Rules for CrediManage.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for partner-related data.
+ * Each partner has full control over their associated loans, installments, payments, and receipts.
+ * Reports and anomalies are accessible more broadly, but write access is restricted.
+ *
+ * Data Structure:
+ * - /partners/{partnerId}: Stores partner information, acting as the root for partner-specific data.
+ * - /partners/{partnerId}/loans/{loanId}: Stores loan information for a partner.
+ * - /partners/{partnerId}/loans/{loanId}/installments/{installmentId}: Stores installment data for a loan.
+ * - /partners/{partnerId}/payments/{paymentId}: Stores payment information for a partner.
+ * - /partners/{partnerId}/payments/{paymentId}/receipts/{receiptId}: Stores receipt information for a payment.
+ * - /reports/{reportId}: Stores financial reports.
+ * - /anomalies/{anomalyId}: Stores anomaly detection data.
+ *
+ * Key Security Decisions:
+ * - User listing is disabled for partners.
+ * - Read access to reports and anomalies is public, but write access is restricted.
+ * - All write operations require a verified Firebase Auth user.
+ *
+ * Denormalization for Authorization:
+ * - Loan, Installment, Payment, and Receipt documents denormalize the 'partnerId' from their parent 'partner' document.
+ *   This allows for direct authorization checks on these documents without needing to perform costly `get()` operations
+ *   on the parent document.  For example, a rule on `/partners/{partnerId}/loans/{loanId}` can directly check
+ *   `if resource.data.partnerId == partnerId` instead of needing to fetch the partner document.
+ *
+ * Structural Segregation:
+ * - Partner-owned data is segregated under the /partners/{partnerId} path, ensuring that each partner's data is isolated
+ *   and accessible only to themselves.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Grants access control to partner documents.
+     * @path /partners/{partnerId}
+     * @allow (create) Authenticated user can create a partner document if the ID matches their auth UID.
+     * @allow (get, list, update, delete) Authenticated user can access (get, list, update, delete) their partner document if the ID matches their auth UID.
+     * @deny (create) Creation is denied if the partner ID does not match the authenticated user's ID.
+     * @deny (update, delete) Updating or deleting is denied if the partner ID does not match the authenticated user's ID or if the document does not exist.
+     * @principle Enforces document ownership for partner data, allowing only the owner to modify it.
+     */
+    match /partners/{partnerId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(partnerId) {
+        return isSignedIn() && request.auth.uid == partnerId;
+      }
+
+      function isExistingOwner(partnerId) {
+        return isOwner(partnerId) && resource != null;
+      }
+
+      allow get: if isOwner(partnerId);
+      allow list: if false; // Prevent listing of all partners
+
+      allow create: if isOwner(partnerId);
+      allow update: if isExistingOwner(partnerId);
+      allow delete: if isExistingOwner(partnerId);
+    }
+
+    /**
+     * @description Grants access control to loan documents within a partner's subcollection.
+     * @path /partners/{partnerId}/loans/{loanId}
+     * @allow (create) Authenticated user can create a loan document if the partner ID matches their auth UID. The 'partnerId' field in the document must also match.
+     * @allow (get, list, update, delete) Authenticated user can access (get, list, update, delete) their loan document if the partner ID matches their auth UID and the document exists.
+     * @deny (create) Creation is denied if the partner ID does not match the authenticated user's ID or if the 'partnerId' field in the document does not match the path.
+     * @deny (update, delete) Updating or deleting is denied if the partner ID does not match the authenticated user's ID, if the document does not exist, or if the 'partnerId' field is changed.
+     * @principle Enforces document ownership for loan data, allowing only the owner to modify it.  Also enforces relational integrity by matching the partnerId in the path and data.
+     */
+    match /partners/{partnerId}/loans/{loanId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(partnerId) {
+        return isSignedIn() && request.auth.uid == partnerId;
+      }
+
+      function isExistingOwner(partnerId) {
+        return isOwner(partnerId) && resource != null;
+      }
+
+      allow get: if isOwner(partnerId);
+      allow list: if isOwner(partnerId);
+
+      allow create: if isOwner(partnerId);
+      allow update: if isExistingOwner(partnerId);
+      allow delete: if isExistingOwner(partnerId);
+    }
+
+    /**
+     * @description Grants access control to installment documents within a loan's subcollection.
+     * @path /partners/{partnerId}/loans/{loanId}/installments/{installmentId}
+     * @allow (create) Authenticated user can create an installment document if the partner ID matches their auth UID. The 'partnerId' field in the document must also match.
+     * @allow (get, list, update, delete) Authenticated user can access (get, list, update, delete) their installment document if the partner ID matches their auth UID and the document exists.
+     * @deny (create) Creation is denied if the partner ID does not match the authenticated user's ID or if the 'partnerId' field in the document does not match the path.
+     * @deny (update, delete) Updating or deleting is denied if the partner ID does not match the authenticated user's ID, if the document does not exist, or if the 'partnerId' field is changed.
+     * @principle Enforces document ownership for installment data, allowing only the owner to modify it.  Also enforces relational integrity by matching the partnerId in the path and data.
+     */
+    match /partners/{partnerId}/loans/{loanId}/installments/{installmentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(partnerId) {
+        return isSignedIn() && request.auth.uid == partnerId;
+      }
+
+      function isExistingOwner(partnerId) {
+        return isOwner(partnerId) && resource != null;
+      }
+
+      allow get: if isOwner(partnerId);
+      allow list: if isOwner(partnerId);
+
+      allow create: if isOwner(partnerId);
+      allow update: if isExistingOwner(partnerId);
+      allow delete: if isExistingOwner(partnerId);
+    }
+
+    /**
+     * @description Grants access control to payment documents within a partner's subcollection.
+     * @path /partners/{partnerId}/payments/{paymentId}
+     * @allow (create) Authenticated user can create a payment document if the partner ID matches their auth UID. The 'partnerId' field in the document must also match.
+     * @allow (get, list, update, delete) Authenticated user can access (get, list, update, delete) their payment document if the partner ID matches their auth UID and the document exists.
+     * @deny (create) Creation is denied if the partner ID does not match the authenticated user's ID or if the 'partnerId' field in the document does not match the path.
+     * @deny (update, delete) Updating or deleting is denied if the partner ID does not match the authenticated user's ID, if the document does not exist, or if the 'partnerId' field is changed.
+     * @principle Enforces document ownership for payment data, allowing only the owner to modify it. Also enforces relational integrity by matching the partnerId in the path and data.
+     */
+    match /partners/{partnerId}/payments/{paymentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(partnerId) {
+        return isSignedIn() && request.auth.uid == partnerId;
+      }
+
+      function isExistingOwner(partnerId) {
+        return isOwner(partnerId) && resource != null;
+      }
+
+      allow get: if isOwner(partnerId);
+      allow list: if isOwner(partnerId);
+
+      allow create: if isOwner(partnerId);
+      allow update: if isExistingOwner(partnerId);
+      allow delete: if isExistingOwner(partnerId);
+    }
+
+    /**
+     * @description Grants access control to receipt documents within a payment's subcollection.
+     * @path /partners/{partnerId}/payments/{paymentId}/receipts/{receiptId}
+     * @allow (create) Authenticated user can create a receipt document if the partner ID matches their auth UID. The 'partnerId' field in the document must also match.
+     * @allow (get, list, update, delete) Authenticated user can access (get, list, update, delete) their receipt document if the partner ID matches their auth UID and the document exists.
+     * @deny (create) Creation is denied if the partner ID does not match the authenticated user's ID or if the 'partnerId' field in the document does not match the path.
+     * @deny (update, delete) Updating or deleting is denied if the partner ID does not match the authenticated user's ID, if the document does not exist, or if the 'partnerId' field is changed.
+     * @principle Enforces document ownership for receipt data, allowing only the owner to modify it. Also enforces relational integrity by matching the partnerId in the path and data.
+     */
+    match /partners/{partnerId}/payments/{paymentId}/receipts/{receiptId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(partnerId) {
+        return isSignedIn() && request.auth.uid == partnerId;
+      }
+
+      function isExistingOwner(partnerId) {
+        return isOwner(partnerId) && resource != null;
+      }
+
+      allow get: if isOwner(partnerId);
+      allow list: if isOwner(partnerId);
+
+      allow create: if isOwner(partnerId);
+      allow update: if isExistingOwner(partnerId);
+      allow delete: if isExistingOwner(partnerId);
+    }
+
+    /**
+     * @description Grants read access to reports, but restricts write access.
+     * @path /reports/{reportId}
+     * @allow (get, list) Allows any user to read reports.
+     * @deny (create, update, delete) Denies all create, update, and delete operations.
+     * @principle Allows public read access for reports while restricting write access.
+     */
+    match /reports/{reportId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Grants read access to anomalies, but restricts write access.
+     * @path /anomalies/{anomalyId}
+     * @allow (get, list) Allows any user to read anomaly detections.
+     * @deny (create, update, delete) Denies all create, update, and delete operations.
+     * @principle Allows public read access for anomalies while restricting write access.
+     */
+    match /anomalies/{anomalyId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+  }
+}

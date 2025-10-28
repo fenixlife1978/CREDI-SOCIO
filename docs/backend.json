@@ -1,130 +1,458 @@
 {
   "entities": {
-    "partner": {
+    "Partner": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Partner",
-      "description": "Represents a member or partner in the loan system.",
       "type": "object",
+      "description": "Represents a member or partner in the lending system.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the partner."
+          "description": "Unique identifier for the Partner entity."
         },
-        "name": {
+        "firstName": {
           "type": "string",
-          "description": "Full name of the partner."
+          "description": "The first name of the partner."
         },
-        "idNumber": {
+        "lastName": {
           "type": "string",
-          "description": "Official identification number of the partner."
+          "description": "The last name of the partner."
+        },
+        "identificationNumber": {
+          "type": "string",
+          "description": "The identification number (e.g., cédula) of the partner."
         },
         "alias": {
           "type": "string",
-          "description": "A nickname for the partner."
+          "description": "An alias or nickname for the partner."
         },
-        "activeLoans": {
-          "type": "number",
-          "description": "Count of active loans."
+        "email": {
+          "type": "string",
+          "description": "The email address of the partner.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The phone number of the partner."
+        },
+        "address": {
+          "type": "string",
+          "description": "The address of the partner."
         }
       },
-      "required": ["id", "name", "idNumber"]
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "identificationNumber"
+      ]
     },
-    "loan": {
+    "Loan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Loan",
-      "description": "Represents a loan given to a partner.",
       "type": "object",
+      "description": "Represents a loan issued to a partner.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the loan."
-        },
-        "partnerName": {
-          "type": "string",
-          "description": "Name of the partner who took the loan."
+          "description": "Unique identifier for the Loan entity."
         },
         "partnerId": {
           "type": "string",
-          "description": "ID of the partner."
+          "description": "Reference to Partner. (Relationship: Partner 1:N Loan)"
+        },
+        "loanType": {
+          "type": "string",
+          "description": "The type of loan (e.g., Standard, Personalizado)."
         },
         "totalAmount": {
           "type": "number",
           "description": "The total amount of the loan."
         },
-        "installments": {
+        "numberOfInstallments": {
           "type": "number",
-          "description": "Number of installments to repay the loan."
+          "description": "The number of installments for the loan."
         },
         "interestRate": {
           "type": "number",
-          "description": "The interest rate for the loan in percentage."
-        },
-        "status": {
-          "type": "string",
-          "enum": ["Active", "Paid Off", "Overdue"],
-          "description": "Current status of the loan."
+          "description": "The interest rate for the loan (percentage or fixed)."
         },
         "startDate": {
           "type": "string",
-          "format": "date",
-          "description": "The date when the loan was started."
+          "description": "The start date of the loan.",
+          "format": "date-time"
         }
       },
-      "required": ["id", "partnerId", "totalAmount", "installments", "interestRate", "status", "startDate"]
+      "required": [
+        "id",
+        "partnerId",
+        "loanType",
+        "totalAmount",
+        "numberOfInstallments",
+        "interestRate",
+        "startDate"
+      ]
     },
-    "payment": {
-      "title": "Payment",
-      "description": "Represents a payment made for a loan installment.",
+    "Installment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Installment",
       "type": "object",
+      "description": "Represents an installment for a loan.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the payment."
-        },
-        "partnerName": {
-          "type": "string",
-          "description": "Name of the partner who made the payment."
+          "description": "Unique identifier for the Installment entity."
         },
         "loanId": {
           "type": "string",
-          "description": "Identifier of the loan this payment is for."
+          "description": "Reference to Loan. (Relationship: Loan 1:N Installment)"
         },
         "installmentNumber": {
           "type": "number",
-          "description": "The installment number being paid."
+          "description": "The installment number (e.g., 1, 2, 3)."
         },
-        "amount": {
-          "type": "number",
-          "description": "The amount paid."
+        "dueDate": {
+          "type": "string",
+          "description": "The due date for the installment.",
+          "format": "date-time"
         },
         "paymentDate": {
           "type": "string",
-          "format": "date-time",
-          "description": "The date and time the payment was made."
+          "description": "The date when the installment was paid (if applicable).",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the installment (e.g., pending, paid)."
+        },
+        "capitalAmount": {
+          "type": "number",
+          "description": "The capital amount for the installment."
+        },
+        "interestAmount": {
+          "type": "number",
+          "description": "The interest amount for the installment."
         }
       },
-      "required": ["id", "loanId", "installmentNumber", "amount", "paymentDate"]
+      "required": [
+        "id",
+        "loanId",
+        "installmentNumber",
+        "dueDate",
+        "status",
+        "capitalAmount",
+        "interestAmount"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Represents a payment made for one or more installments.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "partnerId": {
+          "type": "string",
+          "description": "Reference to Partner. (Relationship: Partner 1:N Payment)"
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "The actual date when the payment was made.",
+          "format": "date-time"
+        },
+        "installmentIds": {
+          "type": "array",
+          "description": "References to Installments. (Relationship: Payment 1:N Installment)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount paid in this payment."
+        }
+      },
+      "required": [
+        "id",
+        "partnerId",
+        "paymentDate",
+        "installmentIds",
+        "totalAmount"
+      ]
+    },
+    "Receipt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Receipt",
+      "type": "object",
+      "description": "Represents a receipt generated for a payment.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Receipt entity."
+        },
+        "paymentId": {
+          "type": "string",
+          "description": "Reference to Payment. (Relationship: Payment 1:1 Receipt)"
+        },
+        "installmentId": {
+          "type": "string",
+          "description": "Reference to Installment. (Relationship: Installment 1:1 Receipt)"
+        },
+        "generationDate": {
+          "type": "string",
+          "description": "The date when the receipt was generated.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount paid for the installment."
+        },
+        "capitalAmount": {
+          "type": "number",
+          "description": "The capital amount paid."
+        },
+        "interestAmount": {
+          "type": "number",
+          "description": "The interest amount paid."
+        }
+      },
+      "required": [
+        "id",
+        "paymentId",
+        "installmentId",
+        "generationDate",
+        "amount",
+        "capitalAmount",
+        "interestAmount"
+      ]
+    },
+    "Report": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Report",
+      "type": "object",
+      "description": "Represents a financial report.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Report entity."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The start date for the report period.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The end date for the report period.",
+          "format": "date-time"
+        },
+        "capitalLoaned": {
+          "type": "number",
+          "description": "The total capital loaned during the period."
+        },
+        "capitalRecovered": {
+          "type": "number",
+          "description": "The total capital recovered during the period."
+        },
+        "interestEarned": {
+          "type": "number",
+          "description": "The total interest earned during the period."
+        }
+      },
+      "required": [
+        "id",
+        "startDate",
+        "endDate",
+        "capitalLoaned",
+        "capitalRecovered",
+        "interestEarned"
+      ]
+    },
+    "Anomaly": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Anomaly",
+      "type": "object",
+      "description": "Represents an anomaly detected in the data.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Anomaly entity."
+        },
+        "entityType": {
+          "type": "string",
+          "description": "The type of entity where the anomaly was detected (e.g., Installment, Payment)."
+        },
+        "entityId": {
+          "type": "string",
+          "description": "The ID of the entity where the anomaly was detected."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the anomaly."
+        },
+        "detectionDate": {
+          "type": "string",
+          "description": "The date when the anomaly was detected.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "entityType",
+        "entityId",
+        "description",
+        "detectionDate"
+      ]
     }
   },
   "auth": {
-    "providers": []
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "/partners/{partnerId}": {
-      "schema": {
-        "$ref": "#/entities/partner"
+    "structure": [
+      {
+        "path": "/partners/{partnerId}",
+        "definition": {
+          "entityName": "Partner",
+          "schema": {
+            "$ref": "#/backend/entities/Partner"
+          },
+          "description": "Stores partner information. Each document represents a partner in the lending system.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the partner."
+            }
+          ]
+        }
       },
-      "description": "Stores information about each partner."
-    },
-    "/loans/{loanId}": {
-      "schema": {
-        "$ref": "#/entities/loan"
+      {
+        "path": "/partners/{partnerId}/loans/{loanId}",
+        "definition": {
+          "entityName": "Loan",
+          "schema": {
+            "$ref": "#/backend/entities/Loan"
+          },
+          "description": "Stores loan information associated with a partner.  The 'partnerId' field is denormalized from the parent partner document to enforce authorization independence. This path enables secure list operations.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the partner."
+            },
+            {
+              "name": "loanId",
+              "description": "The unique identifier of the loan."
+            }
+          ]
+        }
       },
-      "description": "Stores information about each loan."
-    },
-    "/payments/{paymentId}": {
-      "schema": {
-        "$ref": "#/entities/payment"
+      {
+        "path": "/partners/{partnerId}/loans/{loanId}/installments/{installmentId}",
+        "definition": {
+          "entityName": "Installment",
+          "schema": {
+            "$ref": "#/backend/entities/Installment"
+          },
+          "description": "Stores installment information associated with a loan. The 'partnerId' and 'loanId' fields are denormalized from the parent partner and loan documents respectively to enforce authorization independence.  This path enables secure list operations.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the partner."
+            },
+            {
+              "name": "loanId",
+              "description": "The unique identifier of the loan."
+            },
+            {
+              "name": "installmentId",
+              "description": "The unique identifier of the installment."
+            }
+          ]
+        }
       },
-      "description": "Stores a record of each payment made."
-    }
+      {
+        "path": "/partners/{partnerId}/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Stores payment information associated with a partner.  The 'partnerId' field is denormalized from the parent partner document to enforce authorization independence. This path enables secure list operations.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the partner."
+            },
+            {
+              "name": "paymentId",
+              "description": "The unique identifier of the payment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/partners/{partnerId}/payments/{paymentId}/receipts/{receiptId}",
+        "definition": {
+          "entityName": "Receipt",
+          "schema": {
+            "$ref": "#/backend/entities/Receipt"
+          },
+          "description": "Stores receipt information associated with a payment.  The 'partnerId' and 'paymentId' fields are denormalized from the parent partner and payment documents respectively to enforce authorization independence. This path enables secure list operations.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the partner."
+            },
+            {
+              "name": "paymentId",
+              "description": "The unique identifier of the payment."
+            },
+            {
+              "name": "receiptId",
+              "description": "The unique identifier of the receipt."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/reports/{reportId}",
+        "definition": {
+          "entityName": "Report",
+          "schema": {
+            "$ref": "#/backend/entities/Report"
+          },
+          "description": "Stores financial report data.",
+          "params": [
+            {
+              "name": "reportId",
+              "description": "The unique identifier of the report."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/anomalies/{anomalyId}",
+        "definition": {
+          "entityName": "Anomaly",
+          "schema": {
+            "$ref": "#/backend/entities/Anomaly"
+          },
+          "description": "Stores anomaly detection data.",
+          "params": [
+            {
+              "name": "anomalyId",
+              "description": "The unique identifier of the anomaly."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to manage partners, loans, installments, payments, receipts, reports, and anomaly detections for the CrediManage application. It leverages path-based ownership for partner-related data and subcollections to represent one-to-many relationships (e.g., Partner to Loans, Loan to Installments). This structure ensures authorization independence by avoiding hierarchical authorization dependencies and facilitates simple, robust, and easily debuggable security rules.  Specifically, the loan, installment, payment, and receipt documents are nested under the partner document.  This enables simple security rules for access control (e.g. only the partner can see their loans, etc.). This ensures that all documents within the collection have the same security requirements.  QAPs are supported through structural segregation.  The nested structure allows for efficient querying of related data and simplifies the implementation of security rules based on ownership."
   }
 }

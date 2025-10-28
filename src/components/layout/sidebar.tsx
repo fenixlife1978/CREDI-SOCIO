@@ -22,7 +22,6 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
-import { Button } from '../ui/button';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -99,7 +98,7 @@ export function AppSidebar() {
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
-                as={Link}
+                asChild
                 href={item.href}
                 isActive={pathname === item.href}
                 icon={<item.icon />}
@@ -108,7 +107,9 @@ export function AppSidebar() {
                   className: 'bg-primary text-primary-foreground',
                 }}
               >
-                <span>{item.label}</span>
+                <Link href={item.href}>
+                  <span>{item.label}</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
