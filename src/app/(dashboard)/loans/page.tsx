@@ -1,16 +1,30 @@
+'use client';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { mockLoans } from "@/lib/data";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useFirestore } from "@/firebase";
+import { collection, query } from "firebase/firestore";
+import type { Loan } from "@/lib/data";
 
 export default function LoansPage() {
+  const firestore = useFirestore();
+  const { data: loans, isLoading } = useCollection<Loan>(
+    firestore ? query(collection(firestore, 'loans')) : null
+  );
+
   const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
   });
+
+  if (isLoading) {
+    return <div>Cargando préstamos...</div>
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,7 +58,7 @@ export default function LoansPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockLoans.map((loan) => (
+              {loans?.map((loan) => (
                 <TableRow key={loan.id}>
                   <TableCell className="font-medium">{loan.partnerName}</TableCell>
                   <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>

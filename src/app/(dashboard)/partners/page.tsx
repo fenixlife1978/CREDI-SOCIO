@@ -1,11 +1,26 @@
+'use client';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { mockPartners } from "@/lib/data";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useFirestore } from "@/firebase";
+import { collection, query } from "firebase/firestore";
+import type { Partner } from "@/lib/data";
+
 
 export default function PartnersPage() {
+  const firestore = useFirestore();
+  const { data: partners, isLoading } = useCollection<Partner>(
+    firestore ? query(collection(firestore, 'partners')) : null
+  );
+
+  if (isLoading) {
+    return <div>Cargando socios...</div>
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center">
@@ -37,7 +52,7 @@ export default function PartnersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockPartners.map((partner) => (
+              {partners?.map((partner) => (
                 <TableRow key={partner.id}>
                   <TableCell className="font-medium">{partner.name}</TableCell>
                   <TableCell>{partner.idNumber}</TableCell>

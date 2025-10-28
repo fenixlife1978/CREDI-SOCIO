@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "partner": {
+      "title": "Partner",
+      "description": "Represents a member or partner in the loan system.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the partner."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the partner."
+        },
+        "idNumber": {
+          "type": "string",
+          "description": "Official identification number of the partner."
+        },
+        "alias": {
+          "type": "string",
+          "description": "A nickname for the partner."
+        },
+        "activeLoans": {
+          "type": "number",
+          "description": "Count of active loans."
+        }
+      },
+      "required": ["id", "name", "idNumber"]
+    },
+    "loan": {
+      "title": "Loan",
+      "description": "Represents a loan given to a partner.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the loan."
+        },
+        "partnerName": {
+          "type": "string",
+          "description": "Name of the partner who took the loan."
+        },
+        "partnerId": {
+          "type": "string",
+          "description": "ID of the partner."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount of the loan."
+        },
+        "installments": {
+          "type": "number",
+          "description": "Number of installments to repay the loan."
+        },
+        "interestRate": {
+          "type": "number",
+          "description": "The interest rate for the loan in percentage."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Active", "Paid Off", "Overdue"],
+          "description": "Current status of the loan."
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date when the loan was started."
+        }
+      },
+      "required": ["id", "partnerId", "totalAmount", "installments", "interestRate", "status", "startDate"]
+    },
+    "payment": {
+      "title": "Payment",
+      "description": "Represents a payment made for a loan installment.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the payment."
+        },
+        "partnerName": {
+          "type": "string",
+          "description": "Name of the partner who made the payment."
+        },
+        "loanId": {
+          "type": "string",
+          "description": "Identifier of the loan this payment is for."
+        },
+        "installmentNumber": {
+          "type": "number",
+          "description": "The installment number being paid."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount paid."
+        },
+        "paymentDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time the payment was made."
+        }
+      },
+      "required": ["id", "loanId", "installmentNumber", "amount", "paymentDate"]
+    }
+  },
+  "auth": {
+    "providers": []
+  },
+  "firestore": {
+    "/partners/{partnerId}": {
+      "schema": {
+        "$ref": "#/entities/partner"
+      },
+      "description": "Stores information about each partner."
+    },
+    "/loans/{loanId}": {
+      "schema": {
+        "$ref": "#/entities/loan"
+      },
+      "description": "Stores information about each loan."
+    },
+    "/payments/{paymentId}": {
+      "schema": {
+        "$ref": "#/entities/payment"
+      },
+      "description": "Stores a record of each payment made."
+    }
+  }
+}

@@ -16,9 +16,13 @@ import {
   DollarSign,
   ShieldAlert,
   Settings,
+  LogOut
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-provider';
+import { useRouter } from 'next/navigation';
+import { Button } from '../ui/button';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -52,6 +56,13 @@ function CrediManageLogo() {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/lock');
+  }
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -87,38 +98,49 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} passHref>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  icon={<item.icon />}
-                  tooltip={{
-                    children: item.label,
-                    className: 'bg-primary text-primary-foreground',
-                  }}
-                >
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
+              <SidebarMenuButton
+                as={Link}
+                href={item.href}
+                isActive={pathname === item.href}
+                icon={<item.icon />}
+                tooltip={{
+                  children: item.label,
+                  className: 'bg-primary text-primary-foreground',
+                }}
+              >
+                <span>{item.label}</span>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <div className='p-2'>
+      <div className='p-2 mt-auto'>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="#" passHref>
-                <SidebarMenuButton
-                  asChild
-                  icon={<Settings />}
-                  tooltip={{
-                    children: "Settings",
-                    className: 'bg-primary text-primary-foreground',
-                  }}
-                >
-                  <span>Settings</span>
-                </SidebarMenuButton>
-              </Link>
+              <SidebarMenuButton
+                asChild
+                icon={<Settings />}
+                tooltip={{
+                  children: "Ajustes",
+                  className: 'bg-primary text-primary-foreground',
+                }}
+              >
+                <Link href="#">
+                  <span>Ajustes</span>
+                </Link>
+              </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={handleLogout}
+                icon={<LogOut />}
+                tooltip={{
+                  children: "Cerrar sesión",
+                  className: 'bg-primary text-primary-foreground',
+                }}
+              >
+                <span>Cerrar sesión</span>
+              </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </div>
