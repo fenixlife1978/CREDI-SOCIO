@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Trash2, Upload, Pencil } from "lucide-react";
+import { MoreHorizontal, Trash2, Upload, Pencil, ShieldAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, doc, deleteDoc, writeBatch } from "firebase/firestore";
-import type { Loan, Partner } from "@/lib/data";
+import { collection, query, doc, deleteDoc, writeBatch, getDocs, where } from "firebase/firestore";
+import type { Loan, Partner, Installment } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AddLoanDialog } from "./add-loan-dialog";
@@ -24,6 +24,7 @@ export default function LoansPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [isClearAllAlertOpen, setIsClearAllAlertOpen] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
@@ -45,7 +46,7 @@ export default function LoansPage() {
 
   const sortedLoans = useMemo(() => {
     if (!loans) return [];
-    return [...loans].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    return [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [loans]);
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
@@ -82,12 +83,22 @@ export default function LoansPage() {
   const handleDeleteConfirm = async () => {
     if (!loanToDelete || !firestore) return;
     try {
+      const batch = writeBatch(firestore);
+      
       const loanDocRef = doc(firestore, 'loans', loanToDelete.id);
-      await deleteDoc(loanDocRef);
-      // TODO: Also delete related installments
+      batch.delete(loanDocRef);
+
+      const installmentsQuery = query(collection(firestore, 'installments'), where('loanId', '==', loanToDelete.id));
+      const installmentsSnapshot = await getDocs(installmentsQuery);
+      installmentsSnapshot.forEach(installmentDoc => {
+        batch.delete(installmentDoc.ref);
+      });
+
+      await batch.commit();
+
       toast({
         title: "Préstamo Eliminado",
-        description: `El préstamo ha sido eliminado.`,
+        description: `El préstamo y sus cuotas han sido eliminados.`,
       });
     } catch (error) {
       console.error("Error deleting loan: ", error);
@@ -101,6 +112,50 @@ export default function LoansPage() {
       setLoanToDelete(null);
     }
   };
+
+  const handleClearAllConfirm = async () => {
+    if (!firestore) return;
+    try {
+      const batch = writeBatch(firestore);
+      const loansToDelete = loans?.filter(loan => loan.partnerName !== 'ALEXANDER BRICEÑO');
+
+      if (!loansToDelete || loansToDelete.length === 0) {
+        toast({
+          title: 'Nada que eliminar',
+          description: 'No hay préstamos para eliminar (excepto el de ALEXANDER BRICEÑO).',
+        });
+        setIsClearAllAlertOpen(false);
+        return;
+      }
+
+      for (const loan of loansToDelete) {
+        const loanDocRef = doc(firestore, 'loans', loan.id);
+        batch.delete(loanDocRef);
+
+        const installmentsQuery = query(collection(firestore, 'installments'), where('loanId', '==', loan.id));
+        const installmentsSnapshot = await getDocs(installmentsQuery);
+        installmentsSnapshot.forEach(installmentDoc => {
+          batch.delete(installmentDoc.ref);
+        });
+      }
+
+      await batch.commit();
+
+      toast({
+        title: "Préstamos Eliminados",
+        description: `Se han eliminado ${loansToDelete.length} préstamos y sus cuotas asociadas.`,
+      });
+    } catch (error) {
+       console.error("Error deleting all loans: ", error);
+      toast({
+        title: "Error al eliminar",
+        description: "No se pudieron eliminar todos los préstamos. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearAllAlertOpen(false);
+    }
+  }
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -167,11 +222,11 @@ export default function LoansPage() {
               const interestKeys = ['Interés', 'interes', 'tasa', 'Tasa de Interés'];
               for (const key of interestKeys) {
                 if (row[key] !== undefined) {
-                  const rate = parseFloat(row[key]);
-                  return isNaN(rate) ? 0 : rate;
+                  const rate = parseFloat(String(row[key]).replace('%', ''));
+                  return isNaN(rate) ? 5 : rate;
                 }
               }
-              return 0;
+              return 5;
             };
             
             const loanData = {
@@ -187,7 +242,6 @@ export default function LoansPage() {
             };
             batch.set(newLoanDocRef, loanData);
 
-            // Generate installments
             const termDuration = loanData.numberOfInstallments;
             if (termDuration > 0) {
               const capitalPerInstallment = loanData.totalAmount / termDuration;
@@ -292,6 +346,10 @@ export default function LoansPage() {
             <Button size="sm" onClick={openNewDialog}>
               Añadir Préstamo
             </Button>
+             <Button variant="destructive" size="sm" onClick={() => setIsClearAllAlertOpen(true)} disabled={isLoading}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar Todos
+            </Button>
           </div>
         </div>
 
@@ -390,12 +448,34 @@ export default function LoansPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el préstamo de la base de datos.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el préstamo y todas sus cuotas asociadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>Continuar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+       <AlertDialog open={isClearAllAlertOpen} onOpenChange={setIsClearAllAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive"/>¿Estás absolutamente seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es irreversible. Se eliminarán permanentemente todos los préstamos y sus cuotas, 
+              <span className="font-bold"> excepto</span> los que pertenezcan a <span className="font-bold">ALEXANDER BRICEÑO</span>. 
+              No podrás recuperar estos datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleClearAllConfirm}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Sí, eliminar todo lo demás
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
