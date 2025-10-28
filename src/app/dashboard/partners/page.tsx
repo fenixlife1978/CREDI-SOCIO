@@ -93,7 +93,7 @@ export default function PartnersPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table>        
         </CardContent>
       </Card>
     </div>

@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts"
 import { useCollection } from "@/firebase/firestore/use-collection";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { Loan } from "@/lib/data";
 import { format, subMonths } from 'date-fns';
@@ -47,9 +47,11 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
 
 export function OverviewChart() {
   const firestore = useFirestore();
-  const { data: loans } = useCollection<Loan>(
-    firestore ? query(collection(firestore, 'loans')) : null
+  const loansQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'loans')) : null),
+    [firestore]
   );
+  const { data: loans } = useCollection<Loan>(loansQuery);
 
   const data = useMemo(() => {
     const now = new Date();

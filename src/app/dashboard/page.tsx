@@ -9,7 +9,7 @@ import {
 import { DollarSign, Landmark, Users, Activity } from "lucide-react"
 import { OverviewChart } from "./overview-chart";
 import { useCollection } from "@/firebase/firestore/use-collection";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import type { Loan, Partner } from "@/lib/data";
 import { useMemo } from "react";
@@ -44,17 +44,23 @@ function StatCard({ title, value, icon, description, isLoading }: { title: strin
 export default function DashboardPage() {
   const firestore = useFirestore();
   
-  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(
-    firestore ? query(collection(firestore, 'loans')) : null
+  const loansQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'loans')) : null, 
+    [firestore]
   );
+  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
 
-  const { data: partners, isLoading: partnersLoading } = useCollection<Partner>(
-    firestore ? query(collection(firestore, 'partners')) : null
+  const partnersQuery = useMemoFirebase(() =>
+    firestore ? query(collection(firestore, 'partners')) : null,
+    [firestore]
   );
+  const { data: partners, isLoading: partnersLoading } = useCollection<Partner>(partnersQuery);
 
-  const { data: activeLoans, isLoading: activeLoansLoading } = useCollection<Loan>(
-    firestore ? query(collection(firestore, 'loans'), where('status', '==', 'Active')) : null
+  const activeLoansQuery = useMemoFirebase(() =>
+    firestore ? query(collection(firestore, 'loans'), where('status', '==', 'Active')) : null,
+    [firestore]
   );
+  const { data: activeLoans, isLoading: activeLoansLoading } = useCollection<Loan>(activeLoansQuery);
 
   const { totalLent, totalInterest } = useMemo(() => {
     if (!loans) return { totalLent: 0, totalInterest: 0 };
