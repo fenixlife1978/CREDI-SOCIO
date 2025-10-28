@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AddLoanDialog } from "./add-loan-dialog";
 import * as XLSX from 'xlsx';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRouter } from "next/navigation";
 
@@ -127,61 +127,90 @@ export default function LoansPage() {
 
         const batch = writeBatch(firestore);
         const loansCollectionRef = collection(firestore, 'loans');
+        const installmentsRef = collection(firestore, 'installments');
         let importedCount = 0;
         let failedCount = 0;
 
-        json.forEach(row => {
+        for (const row of json) {
           const partnerName = row['Socio'];
           const partner = partners.find(p => `${p.firstName} ${p.lastName}` === partnerName);
 
           if (partner) {
             const newLoanDocRef = doc(loansCollectionRef);
             
-            let startDate = new Date().toISOString();
+            let startDate = new Date();
             const excelDate = row['Fecha de otorgamiento'];
 
             if(excelDate){
                 if(typeof excelDate === 'number') {
-                    // It's an Excel date serial number
-                    startDate = new Date(Math.round((excelDate - 25569) * 864e5)).toISOString();
+                    startDate = new Date(Math.round((excelDate - 25569) * 864e5));
                 } else if(typeof excelDate === 'string') {
-                    // Handle string dates, like 'DD/MM/YYYY'
                     const parts = excelDate.split('/');
                     if (parts.length === 3) {
-                      // Assuming DD/MM/YYYY
                       const day = parseInt(parts[0], 10);
-                      const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                      const month = parseInt(parts[1], 10) - 1;
                       const year = parseInt(parts[2], 10);
                       const date = new Date(year, month, day);
                       if (!isNaN(date.getTime())) {
-                          startDate = date.toISOString();
+                          startDate = date;
                       }
                     } else {
-                        // Try to parse it directly if not in D/M/Y format
                         const date = new Date(excelDate);
                         if (!isNaN(date.getTime())) {
-                            startDate = date.toISOString();
+                            startDate = date;
                         }
                     }
                 }
             }
             
-            const newLoanData = {
+            const loanData = {
               partnerId: partner.id,
               partnerName: partnerName,
-              startDate: startDate,
+              startDate: startDate.toISOString(),
               totalAmount: parseFloat(row['Monto Original'] || 0),
-              loanType: (row['Tipo de Préstamo'] || 'standard').toLowerCase(),
-              numberOfInstallments: parseInt(row['Plazo (cuotas)'] || 0, 10),
-              interestRate: parseFloat(row['Interés'] || 0),
+              loanType: (row['Tipo de Préstamo'] || 'standard').toLowerCase() as 'standard' | 'custom',
+              numberOfInstallments: parseInt(row['Plazo (cuotas)'] || '0', 10),
+              interestRate: parseFloat(row['Interés'] || '0'),
+              fixedInterestAmount: parseFloat(row['Interes Fijo'] || '0'),
               status: row['Estado'] || 'Active',
             };
-            batch.set(newLoanDocRef, newLoanData);
+            batch.set(newLoanDocRef, loanData);
+
+            // Generate installments
+            const termDuration = loanData.numberOfInstallments;
+            if (termDuration > 0) {
+              const capitalPerInstallment = loanData.totalAmount / termDuration;
+              let interestPerInstallment = 0;
+
+              if (loanData.loanType === 'standard') {
+                interestPerInstallment = loanData.totalAmount * (loanData.interestRate / 100);
+              } else { // custom
+                interestPerInstallment = loanData.fixedInterestAmount || 0;
+              }
+
+              const totalPerInstallment = capitalPerInstallment + interestPerInstallment;
+              
+              for (let i = 1; i <= termDuration; i++) {
+                const installmentDocRef = doc(installmentsRef);
+                const dueDate = addMonths(startDate, i);
+                
+                batch.set(installmentDocRef, {
+                  loanId: newLoanDocRef.id,
+                  partnerId: partner.id,
+                  installmentNumber: i,
+                  dueDate: dueDate.toISOString(),
+                  status: 'pending',
+                  capitalAmount: capitalPerInstallment,
+                  interestAmount: interestPerInstallment,
+                  totalAmount: totalPerInstallment,
+                });
+              }
+            }
             importedCount++;
           } else {
             failedCount++;
           }
-        });
+        }
         
         if (importedCount === 0 && failedCount > 0) {
             throw new Error(`No se pudo importar ningún préstamo. ${failedCount} fila(s) no tenían un socio coincidente.`);
@@ -189,13 +218,13 @@ export default function LoansPage() {
 
         await batch.commit();
 
-        let description = `${importedCount} préstamo(s) importado(s) correctamente.`;
+        let description = `${importedCount} préstamo(s) y sus cuotas fueron importados correctamente.`;
         if (failedCount > 0) {
             description += ` ${failedCount} fila(s) fueron omitidas por no encontrar al socio.`;
         }
 
         toast({
-          title: "Éxito Parcial o Total",
+          title: "Importación Completa",
           description: description,
         });
 
