@@ -5,21 +5,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useCollection } from "@/firebase/firestore/use-collection";
-import { useFirestore } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { Partner } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export default function PartnersPage() {
   const firestore = useFirestore();
-  const { data: partners, isLoading } = useCollection<Partner>(
-    firestore ? query(collection(firestore, 'partners')) : null
-  );
 
-  if (isLoading) {
-    return <div>Cargando socios...</div>
-  }
+  const partnersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'partners'));
+  }, [firestore]);
+
+  const { data: partners, isLoading } = useCollection<Partner>(partnersQuery);
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,19 +46,27 @@ export default function PartnersPage() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Cédula</TableHead>
                 <TableHead className="hidden md:table-cell">Alias</TableHead>
-                <TableHead className="hidden md:table-cell">Préstamos Activos</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {partners?.map((partner) => (
+               {isLoading && (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                  </TableRow>
+                ))
+              )}
+              {!isLoading && partners?.map((partner) => (
                 <TableRow key={partner.id}>
-                  <TableCell className="font-medium">{partner.name}</TableCell>
-                  <TableCell>{partner.idNumber}</TableCell>
+                  <TableCell className="font-medium">{`${partner.firstName} ${partner.lastName}`}</TableCell>
+                  <TableCell>{partner.identificationNumber}</TableCell>
                   <TableCell className="hidden md:table-cell">{partner.alias}</TableCell>
-                  <TableCell className="hidden md:table-cell">{partner.activeLoans}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -67,7 +76,7 @@ export default function PartnersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>                        
                         <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
                         <DropdownMenuItem>Editar</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive">Eliminar</DropdownMenuItem>
@@ -76,6 +85,13 @@ export default function PartnersPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {!isLoading && partners?.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">
+                    No se encontraron socios.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -6,25 +6,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useCollection } from "@/firebase/firestore/use-collection";
-import { useFirestore } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { Loan } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function LoansPage() {
   const firestore = useFirestore();
-  const { data: loans, isLoading } = useCollection<Loan>(
-    firestore ? query(collection(firestore, 'loans')) : null
-  );
+  
+  const loansQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'loans'));
+  }, [firestore]);
+
+  const { data: loans, isLoading } = useCollection<Loan>(loansQuery);
 
   const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
   });
-
-  if (isLoading) {
-    return <div>Cargando préstamos...</div>
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,11 +58,23 @@ export default function LoansPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loans?.map((loan) => (
+              {isLoading && (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                  </TableRow>
+                ))
+              )}
+              {!isLoading && loans?.map((loan) => (
                 <TableRow key={loan.id}>
-                  <TableCell className="font-medium">{loan.partnerName}</TableCell>
+                  <TableCell className="font-medium">{loan.partnerName || loan.partnerId}</TableCell>
                   <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>
-                  <TableCell className="hidden md:table-cell">{loan.installments}</TableCell>
+                  <TableCell className="hidden md:table-cell">{loan.numberOfInstallments}</TableCell>
                   <TableCell className="hidden md:table-cell">{loan.interestRate}%</TableCell>
                   <TableCell>
                     <Badge variant={loan.status === 'Paid Off' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
@@ -87,6 +99,13 @@ export default function LoansPage() {
                   </TableCell>
                 </TableRow>
               ))}
+               {!isLoading && loans?.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    No se encontraron préstamos.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

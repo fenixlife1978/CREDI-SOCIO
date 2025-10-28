@@ -5,16 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useCollection } from "@/firebase/firestore/use-collection";
-import { useFirestore } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { Payment } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PaymentsPage() {
     const firestore = useFirestore();
-    const { data: payments, isLoading } = useCollection<Payment>(
-        firestore ? query(collection(firestore, 'payments')) : null
-    );
+    const paymentsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'payments'));
+    }, [firestore]);
+    
+    const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
     
     const currencyFormatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -26,10 +29,6 @@ export default function PaymentsPage() {
         month: 'long',
         day: 'numeric',
     });
-
-    if (isLoading) {
-        return <div>Cargando pagos...</div>
-    }
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,7 +53,6 @@ export default function PaymentsPage() {
               <TableRow>
                 <TableHead>Socio</TableHead>
                 <TableHead>Préstamo ID</TableHead>
-                <TableHead className="hidden md:table-cell">Cuota No.</TableHead>
                 <TableHead>Monto</TableHead>
                 <TableHead className="hidden md:table-cell">Fecha de Pago</TableHead>
                 <TableHead>
@@ -63,12 +61,22 @@ export default function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments?.map((payment) => (
+              {isLoading && (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[180px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[120px]" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                  </TableRow>
+                ))
+              )}
+              {!isLoading && payments?.map((payment) => (
                 <TableRow key={payment.id}>
-                  <TableCell className="font-medium">{payment.partnerName}</TableCell>
+                  <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
                   <TableCell>{payment.loanId}</TableCell>
-                  <TableCell className="hidden md:table-cell">{payment.installmentNumber}</TableCell>
-                  <TableCell>{currencyFormatter.format(payment.amount)}</TableCell>
+                  <TableCell>{currencyFormatter.format(payment.totalAmount)}</TableCell>
                   <TableCell className="hidden md:table-cell">{dateFormatter.format(new Date(payment.paymentDate))}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -87,6 +95,13 @@ export default function PaymentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
+               {!isLoading && payments?.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    No se encontraron pagos.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -4,8 +4,8 @@ import { AppSidebar } from '@/components/layout/sidebar';
 import { AppHeader } from '@/components/layout/header';
 import { useAuth } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
-import { initializeFirebase, FirebaseProvider } from '@/firebase';
+import { useEffect } from 'react';
+import { FirebaseClientProvider } from '@/firebase';
 
 export default function DashboardLayout({
   children,
@@ -14,11 +14,6 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
-
-  const { firebaseApp, auth, firestore } = useMemo(
-    () => initializeFirebase(),
-    []
-  );
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -31,7 +26,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <FirebaseProvider firebaseApp={firebaseApp} auth={auth} firestore={firestore}>
+    <FirebaseClientProvider>
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
@@ -41,6 +36,6 @@ export default function DashboardLayout({
           </main>
         </SidebarInset>
       </SidebarProvider>
-    </FirebaseProvider>
+    </FirebaseClientProvider>
   );
 }

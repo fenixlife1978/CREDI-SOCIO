@@ -1,31 +1,57 @@
+// This file now defines the data structures (types) for the application.
+// The actual data will be fetched from Firestore.
+
 export type Partner = {
-  id: string;
-  name: string;
-  idNumber: string;
-  alias: string;
-  activeLoans: number;
+  id: string; // Document ID from Firestore
+  firstName: string;
+  lastName: string;
+  identificationNumber: string;
+  alias?: string;
+  email?: string;
+  phoneNumber?: string;
+  address?: string;
 };
 
 export type Loan = {
-  id: string;
-  partnerName: string;
-  partnerId: string;
+  id: string; // Document ID from Firestore
+  partnerId: string; // Reference to the partner
+  loanType: string;
   totalAmount: number;
-  installments: number;
+  numberOfInstallments: number;
   interestRate: number;
+  startDate: string; // Should be an ISO string
   status: 'Active' | 'Paid Off' | 'Overdue';
-  startDate: string;
+  
+  // Optional: For displaying partner info directly on the loan
+  partnerName?: string; 
 };
 
 export type Payment = {
-  id:string;
-  partnerName: string;
+  id: string; // Document ID from Firestore
+  partnerId: string;
   loanId: string;
-  installmentNumber: number;
-  amount: number;
-  paymentDate: string;
+  installmentIds: string[];
+  paymentDate: string; // ISO string
+  totalAmount: number;
+  
+  // Optional: For display purposes
+  partnerName?: string;
 };
 
+export type Installment = {
+  id: string;
+  loanId: string;
+  installmentNumber: number;
+  dueDate: string; // ISO string
+  paymentDate?: string; // ISO string
+  status: 'pending' | 'paid';
+  capitalAmount: number;
+  interestAmount: number;
+}
+
+
+// Sample data for the anomaly detector feature.
+// This is NOT used in the main application logic anymore.
 export const sampleLoanForAnomalyDetection = {
   loanId: "L-ANOM-01",
   totalAmount: 1000,
