@@ -1,18 +1,23 @@
 'use client';
 
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query } from "firebase/firestore";
+import { collection, query, addDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import type { Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
-
+import * as XLSX from 'xlsx';
+import { useToast } from "@/hooks/use-toast";
 
 export default function PartnersPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const partnersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -21,15 +26,108 @@ export default function PartnersPage() {
 
   const { data: partners, isLoading } = useCollection<Partner>(partnersQuery);
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !firestore) return;
+
+    setIsImporting(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        if (json.length === 0) {
+            throw new Error("El archivo de Excel está vacío o no tiene el formato correcto.");
+        }
+        
+        const batch = writeBatch(firestore);
+        let importedCount = 0;
+
+        json.forEach(row => {
+          const firstName = row['Nombre'] || row['nombre'];
+          const lastName = row['Apellido'] || row['apellido'];
+          
+          if (firstName && lastName) {
+            const partnerRef = collection(firestore, 'partners');
+            const newPartnerDoc = {
+              firstName: String(firstName),
+              lastName: String(lastName),
+              identificationNumber: String(row['Cédula'] || ''),
+              alias: String(row['Alias'] || ''),
+              // createdAt: serverTimestamp(), // Opcional
+            };
+            batch.set(addDoc(partnerRef, newPartnerDoc).parent.doc(), newPartnerDoc);
+            importedCount++;
+          }
+        });
+
+        if (importedCount === 0) {
+            throw new Error("No se encontraron filas con 'Nombre' y 'Apellido' en el archivo.");
+        }
+
+        await batch.commit();
+
+        toast({
+          title: "Éxito",
+          description: `${importedCount} socio(s) importado(s) correctamente.`,
+        });
+
+      } catch (error: any) {
+        console.error("Error importing partners:", error);
+        toast({
+          title: "Error al importar",
+          description: error.message || "No se pudo procesar el archivo de Excel.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsImporting(false);
+        // Reset file input
+        if(fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.onerror = () => {
+        toast({
+            title: "Error",
+            description: "No se pudo leer el archivo.",
+            variant: "destructive",
+        });
+        setIsImporting(false);
+    }
+    reader.readAsBinaryString(file);
+  };
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
         <h1 className="font-semibold text-lg md:text-2xl">Socios</h1>
-        <Button className="ml-auto" size="sm">
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Añadir Socio
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange}
+            className="hidden" 
+            accept=".xlsx, .xls, .csv"
+          />
+          <Button variant="outline" size="sm" onClick={handleImportClick} disabled={isImporting}>
+            <Upload className="h-4 w-4 mr-2" />
+            {isImporting ? 'Importando...' : 'Importar'}
+          </Button>
+          <Button size="sm">
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Añadir Socio
+          </Button>
+        </div>
       </div>
 
       <Card>
