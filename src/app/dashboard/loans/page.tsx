@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Trash2, Upload } from "lucide-react";
+import { MoreHorizontal, Trash2, Upload, Pencil } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
@@ -23,6 +23,8 @@ export default function LoansPage() {
   const { toast } = useToast();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
+  const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
+  const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -41,7 +43,7 @@ export default function LoansPage() {
 
   const sortedLoans = useMemo(() => {
     if (!loans) return [];
-    return [...loans].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    return [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [loans]);
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
@@ -63,15 +65,27 @@ export default function LoansPage() {
     setLoanToDelete(loan);
     setIsAlertOpen(true);
   };
+  
+  const openEditDialog = (loan: Loan) => {
+    setLoanToEdit(loan);
+    setIsLoanDialogOpen(true);
+  };
+
+  const openNewDialog = () => {
+    setLoanToEdit(null);
+    setIsLoanDialogOpen(true);
+  };
+
 
   const handleDeleteConfirm = async () => {
     if (!loanToDelete || !firestore) return;
     try {
       const loanDocRef = doc(firestore, 'loans', loanToDelete.id);
       await deleteDoc(loanDocRef);
+      // TODO: Also delete related installments
       toast({
         title: "Préstamo Eliminado",
-        description: `El préstamo con ID ${loanToDelete.id} ha sido eliminado.`,
+        description: `El préstamo ha sido eliminado.`,
       });
     } catch (error) {
       console.error("Error deleting loan: ", error);
@@ -212,6 +226,12 @@ export default function LoansPage() {
 
   return (
     <>
+      <AddLoanDialog
+        isOpen={isLoanDialogOpen}
+        setIsOpen={setIsLoanDialogOpen}
+        loanToEdit={loanToEdit}
+      />
+      
       <div className="flex flex-col gap-6">
         <div className="flex items-center">
           <h1 className="font-semibold text-lg md:text-2xl">Préstamos</h1>
@@ -227,7 +247,9 @@ export default function LoansPage() {
               <Upload className="h-4 w-4 mr-2" />
               {isImporting ? 'Importando...' : 'Importar'}
             </Button>
-            <AddLoanDialog />
+            <Button size="sm" onClick={openNewDialog}>
+              Añadir Préstamo
+            </Button>
           </div>
         </div>
 
@@ -291,7 +313,10 @@ export default function LoansPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                             <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditDialog(loan)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => openDeleteDialog(loan)}
@@ -335,5 +360,3 @@ export default function LoansPage() {
     </>
   );
 }
-
-    

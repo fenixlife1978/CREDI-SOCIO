@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -32,13 +31,13 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { PlusCircle, Loader, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader, Check, ChevronsUpDown } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, writeBatch, doc } from 'firebase/firestore';
+import { collection, addDoc, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import type { Partner, Loan } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format, addMonths } from 'date-fns';
+import { format, addMonths, parseISO } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const loanSchema = z.object({
@@ -70,12 +69,19 @@ const loanSchema = z.object({
 
 type LoanFormData = z.infer<typeof loanSchema>;
 
-export function AddLoanDialog() {
+interface AddLoanDialogProps {
+    isOpen: boolean;
+    setIsOpen: (isOpen: boolean) => void;
+    loanToEdit?: Loan | null;
+}
+
+export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  
+  const isEditMode = !!loanToEdit;
 
   const partnersQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'partners') : null),
@@ -85,16 +91,34 @@ export function AddLoanDialog() {
 
   const form = useForm<LoanFormData>({
     resolver: zodResolver(loanSchema),
-    defaultValues: {
-      loanType: 'standard',
-      totalAmount: 0,
-      interestRate: 0,
-      numberOfInstallments: 1,
-      fixedInterestAmount: 0,
-      hasTerm: 'yes',
-      startDate: format(new Date(), 'yyyy-MM-dd'),
-    },
   });
+
+  useEffect(() => {
+    if (isEditMode && loanToEdit) {
+      form.reset({
+        partnerId: loanToEdit.partnerId,
+        loanType: loanToEdit.loanType,
+        totalAmount: loanToEdit.totalAmount,
+        interestRate: loanToEdit.interestRate,
+        numberOfInstallments: loanToEdit.numberOfInstallments,
+        startDate: format(parseISO(loanToEdit.startDate), 'yyyy-MM-dd'),
+        // Note: custom loan fields might need to be added here if they exist on the loan object
+        fixedInterestAmount: 0, // Assuming default, adjust if stored
+        hasTerm: 'yes', // Assuming default, adjust if stored
+      });
+    } else {
+      form.reset({
+        loanType: 'standard',
+        totalAmount: 0,
+        interestRate: 0,
+        numberOfInstallments: 1,
+        fixedInterestAmount: 0,
+        hasTerm: 'yes',
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        partnerId: undefined,
+      });
+    }
+  }, [isOpen, isEditMode, loanToEdit, form]);
 
   const loanType = form.watch('loanType');
   const hasTerm = form.watch('hasTerm');
@@ -104,76 +128,95 @@ export function AddLoanDialog() {
     setIsSubmitting(true);
   
     try {
-      const selectedPartner = partners?.find(p => p.id === data.partnerId);
-      const batch = writeBatch(firestore);
-  
-      // 1. Create Loan Document
-      const loanCollectionRef = collection(firestore, 'loans');
-      const loanDocRef = doc(loanCollectionRef);
-      
-      const loanData: Omit<Loan, 'id'> = {
-        partnerId: data.partnerId,
-        loanType: data.loanType,
-        totalAmount: data.totalAmount,
-        startDate: new Date(data.startDate).toISOString(),
-        partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
-        status: 'Active',
-        numberOfInstallments: data.numberOfInstallments ?? 0,
-        interestRate: data.interestRate ?? 0,
-      };
-      batch.set(loanDocRef, loanData);
-  
-      // 2. Create Installment Documents if applicable
-      const installmentsRef = collection(firestore, 'installments');
-      const termDuration = data.loanType === 'standard' || (data.loanType === 'custom' && data.hasTerm === 'yes') 
-        ? data.numberOfInstallments
-        : 0;
+      if (isEditMode && loanToEdit) {
+        // Update existing loan
+        const loanDocRef = doc(firestore, 'loans', loanToEdit.id);
+        const selectedPartner = partners?.find(p => p.id === data.partnerId);
 
-      if (termDuration && termDuration > 0) {
-        const capitalPerInstallment = data.totalAmount / termDuration;
-        let interestPerInstallment = 0;
-
-        if(data.loanType === 'standard'){
-            interestPerInstallment = data.totalAmount * ((data.interestRate || 0) / 100);
-        } else { // custom
-            interestPerInstallment = data.fixedInterestAmount || 0;
-        }
-
-        const totalPerInstallment = capitalPerInstallment + interestPerInstallment;
-        const startDate = new Date(data.startDate);
-
-        for (let i = 1; i <= termDuration; i++) {
-          const installmentDocRef = doc(installmentsRef);
-          const dueDate = addMonths(startDate, i);
-          
-          batch.set(installmentDocRef, {
-            loanId: loanDocRef.id,
+        const loanData: Partial<Loan> = {
             partnerId: data.partnerId,
-            installmentNumber: i,
-            dueDate: dueDate.toISOString(),
-            status: 'pending',
-            capitalAmount: capitalPerInstallment,
-            interestAmount: interestPerInstallment,
-            totalAmount: totalPerInstallment,
-          });
+            loanType: data.loanType,
+            totalAmount: data.totalAmount,
+            startDate: new Date(data.startDate).toISOString(),
+            partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
+            numberOfInstallments: data.numberOfInstallments ?? 0,
+            interestRate: data.interestRate ?? 0,
+        };
+        await updateDoc(loanDocRef, loanData);
+        toast({
+            title: '¡Éxito!',
+            description: 'El préstamo ha sido actualizado correctamente.',
+        });
+
+      } else {
+        // Create new loan
+        const selectedPartner = partners?.find(p => p.id === data.partnerId);
+        const batch = writeBatch(firestore);
+    
+        const loanCollectionRef = collection(firestore, 'loans');
+        const loanDocRef = doc(loanCollectionRef);
+        
+        const loanData: Omit<Loan, 'id'> = {
+          partnerId: data.partnerId,
+          loanType: data.loanType,
+          totalAmount: data.totalAmount,
+          startDate: new Date(data.startDate).toISOString(),
+          partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
+          status: 'Active',
+          numberOfInstallments: data.numberOfInstallments ?? 0,
+          interestRate: data.interestRate ?? 0,
+        };
+        batch.set(loanDocRef, loanData);
+    
+        const installmentsRef = collection(firestore, 'installments');
+        const termDuration = data.loanType === 'standard' || (data.loanType === 'custom' && data.hasTerm === 'yes') 
+          ? data.numberOfInstallments
+          : 0;
+
+        if (termDuration && termDuration > 0) {
+          const capitalPerInstallment = data.totalAmount / termDuration;
+          let interestPerInstallment = 0;
+
+          if(data.loanType === 'standard'){
+              interestPerInstallment = data.totalAmount * ((data.interestRate || 0) / 100);
+          } else { // custom
+              interestPerInstallment = data.fixedInterestAmount || 0;
+          }
+
+          const totalPerInstallment = capitalPerInstallment + interestPerInstallment;
+          const startDate = new Date(data.startDate);
+
+          for (let i = 1; i <= termDuration; i++) {
+            const installmentDocRef = doc(installmentsRef);
+            const dueDate = addMonths(startDate, i);
+            
+            batch.set(installmentDocRef, {
+              loanId: loanDocRef.id,
+              partnerId: data.partnerId,
+              installmentNumber: i,
+              dueDate: dueDate.toISOString(),
+              status: 'pending',
+              capitalAmount: capitalPerInstallment,
+              interestAmount: interestPerInstallment,
+              totalAmount: totalPerInstallment,
+            });
+          }
         }
+        await batch.commit();
+    
+        toast({
+          title: '¡Éxito!',
+          description: 'El préstamo y sus cuotas han sido añadidos correctamente.',
+        });
       }
-      // For custom loans without a term, no installments are pre-generated.
-  
-      await batch.commit();
-  
-      toast({
-        title: '¡Éxito!',
-        description: 'El préstamo y sus cuotas han sido añadidos correctamente.',
-      });
   
       form.reset();
-      setOpen(false);
+      setIsOpen(false);
     } catch (error) {
-      console.error('Error adding loan:', error);
+      console.error('Error saving loan:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo añadir el préstamo. Inténtalo de nuevo.',
+        description: 'No se pudo guardar el préstamo. Inténtalo de nuevo.',
         variant: 'destructive',
       });
     } finally {
@@ -182,18 +225,12 @@ export function AddLoanDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Añadir Préstamo
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Añadir Nuevo Préstamo</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Editar Préstamo' : 'Añadir Nuevo Préstamo'}</DialogTitle>
           <DialogDescription>
-            Completa la información para registrar un nuevo préstamo.
+            {isEditMode ? 'Actualiza la información del préstamo.' : 'Completa la información para registrar un nuevo préstamo.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -210,6 +247,7 @@ export function AddLoanDialog() {
                         <Button
                           variant="outline"
                           role="combobox"
+                          disabled={isEditMode} // Disable changing partner on edit
                           className={cn(
                             'w-full justify-between',
                             !field.value && 'text-muted-foreground'
@@ -269,8 +307,9 @@ export function AddLoanDialog() {
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex space-x-4"
+                      disabled={isEditMode} // Usually loan type is not editable
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">
                         <FormControl>
@@ -298,7 +337,7 @@ export function AddLoanDialog() {
                 <FormItem>
                   <FormLabel>Monto Total</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Ej: 1000" {...field} />
+                    <Input type="number" placeholder="Ej: 1000" {...field} disabled={isEditMode} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -314,7 +353,7 @@ export function AddLoanDialog() {
                     <FormItem>
                       <FormLabel>Número de Cuotas</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} />
+                        <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} disabled={isEditMode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -345,7 +384,7 @@ export function AddLoanDialog() {
                     <FormItem>
                       <FormLabel>Monto de Interés Fijo (por cuota)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} />
+                        <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} disabled={isEditMode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -360,8 +399,9 @@ export function AddLoanDialog() {
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                           className="flex space-x-4"
+                          disabled={isEditMode}
                         >
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl>
@@ -389,7 +429,7 @@ export function AddLoanDialog() {
                       <FormItem>
                         <FormLabel>Número de Cuotas</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} />
+                          <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} disabled={isEditMode} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -416,7 +456,7 @@ export function AddLoanDialog() {
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar Préstamo
+                {isEditMode ? 'Guardar Cambios' : 'Guardar Préstamo'}
               </Button>
             </DialogFooter>
           </form>
