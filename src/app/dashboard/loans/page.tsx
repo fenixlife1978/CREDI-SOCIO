@@ -252,8 +252,8 @@ export default function LoansPage() {
                   <TableRow key={loan.id}>
                     <TableCell className="font-medium">{loan.partnerName || loan.partnerId}</TableCell>
                     <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{loan.numberOfInstallments}</TableCell>
-                    <TableCell className="hidden md:table-cell">{loan.interestRate}%</TableCell>
+                    <TableCell className="hidden md:table-cell">{!isNaN(loan.numberOfInstallments) ? loan.numberOfInstallments : '-'}</TableCell>
+                    <TableCell className="hidden md:table-cell">{!isNaN(loan.interestRate) ? `${loan.interestRate}%` : '-'}</TableCell>
                     <TableCell>
                       <Badge variant={loan.status === 'Paid Off' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
                         {loan.status}
