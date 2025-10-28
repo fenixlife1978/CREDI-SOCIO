@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts"
+import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts"
 import { useCollection } from "@/firebase/firestore/use-collection";
 import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
@@ -18,23 +18,21 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
             <span className="text-[0.70rem] uppercase text-muted-foreground">
               {label}
             </span>
-            <span className="font-bold text-muted-foreground">
-              {payload[0].name}
-            </span>
-            <span className="font-bold text-muted-foreground">
-              {payload[1].name}
-            </span>
+             {payload.map((p, i) => (
+              <span key={i} className="font-bold" style={{color: p.color}}>
+                {p.name}
+              </span>
+            ))}
           </div>
           <div className="flex flex-col space-y-1">
             <span className="text-[0.70rem] uppercase text-muted-foreground">
               Total
             </span>
-            <span className="font-bold">
-              {`$${payload[0].value}`}
-            </span>
-            <span className="font-bold">
-              {`$${payload[1].value}`}
-            </span>
+            {payload.map((p, i) => (
+                <span key={i} className="font-bold" style={{color: p.color}}>
+                    {`$${p.value}`}
+                </span>
+            ))}
           </div>
         </div>
       </div>
@@ -83,8 +81,18 @@ export function OverviewChart() {
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
+      <AreaChart data={data}>
+        <defs>
+            <linearGradient id="colorLent" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+            </linearGradient>
+            <linearGradient id="colorRecovered" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+            </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
         <XAxis
           dataKey="name"
           stroke="hsl(var(--muted-foreground))"
@@ -103,10 +111,10 @@ export function OverviewChart() {
             content={<CustomTooltip />}
             cursor={{ fill: "hsl(var(--muted))", opacity: 0.5 }}
         />
-        <Legend />
-        <Bar dataKey="lent" name="Capital Prestado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="recovered" name="Capital Recuperado" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
-      </BarChart>
+        <Legend wrapperStyle={{paddingTop: '20px'}}/>
+        <Area type="monotone" dataKey="lent" name="Pagado este mes" stroke="hsl(var(--primary))" fill="url(#colorLent)" />
+        <Area type="monotone" dataKey="recovered" name="Vencimiento del pago" stroke="hsl(var(--accent))" fill="url(#colorRecovered)" />
+      </AreaChart>
     </ResponsiveContainer>
   )
 }

@@ -16,7 +16,8 @@ import {
   DollarSign,
   ShieldAlert,
   Settings,
-  LogOut
+  LogOut,
+  Sun
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -33,22 +34,11 @@ const navItems = [
 
 function CrediManageLogo() {
   return (
-    <div className="flex items-center gap-2 font-semibold text-lg text-primary">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-7 w-7"
-      >
-        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-        <path d="M2 17l10 5 10-5"></path>
-        <path d="M2 12l10 5 10-5"></path>
-      </svg>
-      <span>CrediManage</span>
+    <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
+       <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+        <div className="w-4 h-4 rounded-full bg-sidebar-background" />
+      </div>
+      <span className="group-data-[collapsible=icon]:hidden">LOAN MANAGER</span>
     </div>
   );
 }
@@ -68,29 +58,11 @@ export function AppSidebar() {
       <SidebarHeader>
         <div
           className={cn(
-            'flex h-10 w-full items-center px-2',
+            'flex h-14 w-full items-center px-4',
             'group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
           )}
         >
-          <div className="group-data-[collapsible=icon]:hidden">
             <CrediManageLogo />
-          </div>
-          <div className="hidden group-data-[collapsible=icon]:block">
-             <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-7 w-7 text-primary"
-              >
-                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                <path d="M2 17l10 5 10-5"></path>
-                <path d="M2 12l10 5 10-5"></path>
-              </svg>
-          </div>
         </div>
       </SidebarHeader>
       <SidebarContent className="p-2">
@@ -108,7 +80,7 @@ export function AppSidebar() {
                 }}
               >
                 <Link href={item.href}>
-                  <span>{item.label}</span>
+                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -120,14 +92,14 @@ export function AppSidebar() {
           <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                icon={<Settings />}
+                icon={<Sun />}
                 tooltip={{
-                  children: "Ajustes",
+                  children: "Modo claro",
                   className: 'bg-primary text-primary-foreground',
                 }}
               >
                 <Link href="#">
-                  <span>Ajustes</span>
+                  <span className="group-data-[collapsible=icon]:hidden">Modo claro</span>
                 </Link>
               </SidebarMenuButton>
           </SidebarMenuItem>
@@ -140,7 +112,7 @@ export function AppSidebar() {
                   className: 'bg-primary text-primary-foreground',
                 }}
               >
-                <span>Cerrar sesión</span>
+                <span className="group-data-[collapsible=icon]:hidden">Cerrar sesión</span>
               </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

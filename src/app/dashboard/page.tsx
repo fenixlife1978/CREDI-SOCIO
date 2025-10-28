@@ -2,22 +2,21 @@
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { DollarSign, Landmark, Users, Activity } from "lucide-react"
 import { OverviewChart } from "./overview-chart";
-import { useCollection } from "@/firebase/firestore/use-collection";
-import { useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import type { Loan, Partner } from "@/lib/data";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
-function StatCard({ title, value, icon, description, isLoading }: { title: string, value: string, icon: React.ReactNode, description?: string, isLoading: boolean }) {
+function StatCard({ title, value, icon, description, isLoading, className }: { title: string, value: string, icon: React.ReactNode, description?: string, isLoading: boolean, className?: string }) {
     return (
-        <Card>
+        <Card className={cn("rounded-2xl", className)}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                     {title}
@@ -27,13 +26,13 @@ function StatCard({ title, value, icon, description, isLoading }: { title: strin
             <CardContent>
               {isLoading ? (
                 <>
-                  <Skeleton className="h-8 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-8 w-3/4 mb-2 bg-white/20" />
+                  <Skeleton className="h-4 w-1/2 bg-white/20" />
                 </>
               ) : (
                 <>
                   <div className="text-2xl font-bold">{value}</div>
-                  {description && <p className="text-xs text-muted-foreground">{description}</p>}
+                  {description && <p className="text-xs text-white/80">{description}</p>}
                 </>
               )}
             </CardContent>
@@ -62,16 +61,21 @@ export default function DashboardPage() {
   );
   const { data: activeLoans, isLoading: activeLoansLoading } = useCollection<Loan>(activeLoansQuery);
 
-  const { totalLent, totalInterest } = useMemo(() => {
-    if (!loans) return { totalLent: 0, totalInterest: 0 };
+  const { totalLent, totalInterest, paymentDue } = useMemo(() => {
+    if (!loans) return { totalLent: 0, totalInterest: 0, paymentDue: 0 };
     return loans.reduce((acc, loan) => {
         const interest = loan.totalAmount * (loan.interestRate / 100);
         acc.totalLent += loan.totalAmount;
         if (loan.status === 'Paid Off') {
             acc.totalInterest += interest;
         }
+        if (loan.status === 'Active' || loan.status === 'Overdue') {
+          // A simple calculation for payment due. This could be more complex in a real app.
+          const monthlyPayment = (loan.totalAmount * (1 + loan.interestRate / 100)) / loan.numberOfInstallments;
+          acc.paymentDue += monthlyPayment;
+        }
         return acc;
-    }, { totalLent: 0, totalInterest: 0 });
+    }, { totalLent: 0, totalInterest: 0, paymentDue: 0 });
   }, [loans]);
 
   const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -85,31 +89,35 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
-            title="Capital Prestado"
-            value={currencyFormatter.format(totalLent)}
-            icon={<Landmark className="h-4 w-4 text-muted-foreground" />}
+            title="Préstamos Activos"
+            value={`${activeLoans?.length ?? 0}`}
+            icon={<Activity className="h-4 w-4" />}
             isLoading={isLoading}
+            className="bg-[#FDC27A] text-white"
         />
         <StatCard 
-            title="Intereses Ganados"
-            value={currencyFormatter.format(totalInterest)}
-            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+            title="Pago adeudado"
+            value={currencyFormatter.format(paymentDue)}
+            icon={<DollarSign className="h-4 w-4" />}
             isLoading={isLoading}
+             className="bg-[#65C466] text-white"
+        />
+        <StatCard 
+            title="Pagado este mes"
+            value={currencyFormatter.format(totalInterest)} // Example: using total interest as proxy
+            icon={<DollarSign className="h-4 w-4" />}
+            isLoading={isLoading}
+             className="bg-[#FE5D56] text-white"
         />
         <StatCard 
             title="Socios Activos"
-            value={`+${partners?.length ?? 0}`}
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
+            value={`${partners?.length ?? 0}`}
+            icon={<Users className="h-4 w-4" />}
             isLoading={isLoading}
-        />
-        <StatCard 
-            title="Préstamos Activos"
-            value={`+${activeLoans?.length ?? 0}`}
-            icon={<Activity className="h-4 w-4 text-muted-foreground" />}
-            isLoading={isLoading}
+            className="bg-primary text-primary-foreground"
         />
       </div>
-      <Card>
+      <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>Visión General</CardTitle>
           <CardDescription>Capital prestado vs. recuperado en los últimos 6 meses.</CardDescription>
