@@ -47,12 +47,19 @@ export function AnomalyDetector({ sampleData }: { sampleData: string }) {
   });
 
   useEffect(() => {
-    if (state.message) {
+    if (state.message && (state.isError || (state.anomalies && state.anomalies.length > 0))) {
       toast({
-        title: state.isError ? "Error" : "Éxito",
+        title: state.isError ? "Error" : "Análisis Completado",
         description: state.message,
         variant: state.isError ? "destructive" : "default",
       });
+    } else if (state.message && !state.isError && state.anomalies?.length === 0) {
+        toast({
+            title: "¡Todo en orden!",
+            description: state.message,
+            variant: "default",
+            className: "border-green-500 text-green-700 dark:border-green-600 dark:text-green-400"
+        });
     }
   }, [state, toast]);
 

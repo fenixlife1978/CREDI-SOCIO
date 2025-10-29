@@ -54,7 +54,7 @@ export async function runAnomalyDetection(
         };
     }
     return {
-      message: 'Anomalías detectadas.',
+      message: `${result.anomalies.length} anomalía(s) detectada(s).`,
       isError: false,
       anomalies: result.anomalies,
     };
