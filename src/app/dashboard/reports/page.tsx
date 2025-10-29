@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { Payment, Installment } from '@/lib/data';
 import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
