@@ -1,9 +1,12 @@
 'use client';
 
-import React, { type ReactNode, useEffect, useState } from 'react';
+import React, { type ReactNode, useEffect, useState, useMemo } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
-import { auth, firestore, firebaseApp } from '@/firebase/client';
+import { initializeFirebase } from '@/firebase'; // Use the new initializer
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
+import type { FirebaseApp } from 'firebase/app';
+import type { Firestore } from 'firebase/firestore';
+import type { Auth } from 'firebase/auth';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -13,12 +16,10 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!auth) {
-      setIsLoading(false);
-      return;
-    }
+  // useMemo ensures Firebase is initialized only once.
+  const { firebaseApp, firestore, auth } = useMemo(() => initializeFirebase(), []);
 
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -33,7 +34,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth]); // Dependency array with auth instance
 
   // While waiting for auth state, render nothing to prevent child components from running
   if (isLoading) {

@@ -1,4 +1,3 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 
 export const firebaseConfig = {
   "projectId": "studio-5740654397-14205",
@@ -7,14 +6,4 @@ export const firebaseConfig = {
   "authDomain": "studio-5740654397-14205.firebaseapp.com",
   "measurementId": "",
   "messagingSenderId": "318145535367"
-};
-
-// Helper function to initialize Firebase, safe for both server and client.
-// This function is NOT directly called by client-side code anymore to prevent issues.
-export function initializeFirebaseApp(): FirebaseApp {
-  if (!getApps().length) {
-    return initializeApp(firebaseConfig);
-  } else {
-    return getApp();
-  }
 };
