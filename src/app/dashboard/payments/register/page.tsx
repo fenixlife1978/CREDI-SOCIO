@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, query, where, writeBatch, getDocs, doc } from 'firebase/firestore';
 import type { Installment, Partner, Loan } from '@/lib/data';
 import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Trash2, Loader } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const months = Array.from({ length: 12 }, (_, i) => ({
   value: i,
@@ -26,10 +27,12 @@ const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 
 export default function RegisterPaymentPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedInstallments, setSelectedInstallments] = useState<Record<string, boolean>>({});
   const [isCleaning, setIsCleaning] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const installmentsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'pending')) : null),
@@ -47,6 +50,11 @@ export default function RegisterPaymentPage() {
     if (!partners) return new Map();
     return new Map(partners.map(p => [p.id, `${p.firstName} ${p.lastName}`]));
   }, [partners]);
+
+   const loansMap = useMemo(() => {
+    if (!loans) return new Map();
+    return new Map(loans.map(l => [l.id, l]));
+  }, [loans]);
 
   const filteredInstallments = useMemo(() => {
     if (!installments) return [];
@@ -81,6 +89,96 @@ export default function RegisterPaymentPage() {
   const handleSelectRow = (id: string, checked: boolean) => {
     setSelectedInstallments(prev => ({ ...prev, [id]: checked }));
   };
+
+  const handleProcessPayments = async () => {
+    if (!firestore || !installments) return;
+    
+    const installmentIdsToProcess = Object.entries(selectedInstallments)
+      .filter(([, isSelected]) => isSelected)
+      .map(([id]) => id);
+
+    if (installmentIdsToProcess.length === 0) {
+      toast({
+        title: "No hay cuotas seleccionadas",
+        description: "Por favor, marca las cuotas que deseas procesar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const batch = writeBatch(firestore);
+      const paymentDate = new Date().toISOString();
+      const installmentsToUpdate = installments.filter(inst => installmentIdsToProcess.includes(inst.id));
+
+      const loanStatusCheck: Record<string, boolean> = {};
+
+      for (const inst of installmentsToUpdate) {
+        // 1. Mark installment as paid
+        const installmentRef = doc(firestore, 'installments', inst.id);
+        batch.update(installmentRef, { status: 'paid', paymentDate });
+
+        // 2. Create payment record
+        const paymentRef = doc(collection(firestore, 'payments'));
+        const partnerName = partnersMap.get(inst.partnerId) || inst.partnerId;
+        batch.set(paymentRef, {
+            partnerId: inst.partnerId,
+            loanId: inst.loanId,
+            installmentIds: [inst.id], // One payment record per installment for simplicity
+            paymentDate,
+            totalAmount: inst.totalAmount,
+            partnerName,
+        });
+
+        // Mark loan for status check
+        loanStatusCheck[inst.loanId] = true;
+      }
+
+      // 3. Check if any loans are now fully paid off
+      for (const loanId of Object.keys(loanStatusCheck)) {
+          const loan = loansMap.get(loanId);
+          if (!loan) continue;
+
+          // Check if ALL installments for this loan will be 'paid' after this batch
+          const allInstallmentsForLoan = await getDocs(
+              query(collection(firestore, 'installments'), where('loanId', '==', loanId))
+          );
+
+          const allPaid = allInstallmentsForLoan.docs.every(docSnap => {
+              const installmentId = docSnap.id;
+              // Is it part of the current batch being paid?
+              if (installmentIdsToProcess.includes(installmentId)) return true;
+              // Or was it already paid before?
+              return docSnap.data().status === 'paid';
+          });
+          
+          if (allPaid) {
+              const loanRef = doc(firestore, 'loans', loanId);
+              batch.update(loanRef, { status: 'Paid Off' });
+          }
+      }
+
+      await batch.commit();
+
+      toast({
+        title: "¡Pagos Procesados!",
+        description: `${installmentsToUpdate.length} cuota(s) han sido marcadas como pagadas.`,
+      });
+      setSelectedInstallments({}); // Clear selection
+    } catch (error) {
+      console.error("Error processing payments:", error);
+      toast({
+        title: "Error al Procesar Pagos",
+        description: "Ocurrió un error. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
 
   const handleCleanOrphanInstallments = async () => {
     if (!firestore) return;
@@ -198,7 +296,11 @@ export default function RegisterPaymentPage() {
                   <TableHead padding="checkbox" className="w-12">
                     <Checkbox
                       onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
-                      checked={filteredInstallments.length > 0 && Object.keys(selectedInstallments).length === filteredInstallments.length && Object.values(selectedInstallments).every(v => v)}
+                      checked={
+                        filteredInstallments.length > 0 &&
+                        Object.values(selectedInstallments).filter(Boolean).length === filteredInstallments.length
+                      }
+                      aria-label="Seleccionar todo"
                     />
                   </TableHead>
                   <TableHead>Socio</TableHead>
@@ -232,6 +334,7 @@ export default function RegisterPaymentPage() {
                       <Checkbox
                         checked={selectedInstallments[installment.id] || false}
                         onCheckedChange={(checked) => handleSelectRow(installment.id, Boolean(checked))}
+                        aria-label={`Seleccionar cuota ${installment.installmentNumber} de ${partnersMap.get(installment.partnerId)}`}
                       />
                     </TableCell>
                     <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || 'Socio no encontrado'}</TableCell>
@@ -266,11 +369,17 @@ export default function RegisterPaymentPage() {
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline">Cancelar</Button>
-        <Button disabled={Object.values(selectedInstallments).every(v => !v)}>
+        <Button variant="outline" onClick={() => router.back()}>Cancelar</Button>
+        <Button 
+          onClick={handleProcessPayments}
+          disabled={isProcessing || Object.values(selectedInstallments).every(v => !v)}
+        >
+          {isProcessing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
           Procesar Pagos Seleccionados
         </Button>
       </div>
     </div>
   );
 }
+
+    
