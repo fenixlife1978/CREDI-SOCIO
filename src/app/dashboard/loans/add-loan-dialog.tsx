@@ -127,6 +127,9 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
     setIsSubmitting(true);
   
     try {
+        const [year, month, day] = data.startDate.split('-').map(Number);
+        const startDate = new Date(year, month - 1, day);
+
       if (isEditMode && loanToEdit) {
         // Update existing loan
         const loanDocRef = doc(firestore, 'loans', loanToEdit.id);
@@ -136,7 +139,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
             partnerId: data.partnerId,
             loanType: data.loanType,
             totalAmount: data.totalAmount,
-            startDate: new Date(data.startDate).toISOString(),
+            startDate: startDate.toISOString(),
             partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
             numberOfInstallments: data.numberOfInstallments ?? 0,
             interestRate: data.interestRate ?? 0,
@@ -161,7 +164,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
           partnerId: data.partnerId,
           loanType: data.loanType,
           totalAmount: data.totalAmount,
-          startDate: new Date(data.startDate).toISOString(),
+          startDate: startDate.toISOString(),
           partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
           status: 'Active',
           numberOfInstallments: data.numberOfInstallments ?? 0,
@@ -190,7 +193,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
 
               const installmentTotal = capitalPerInstallment + interestForInstallment;
               const installmentDocRef = doc(installmentsRef);
-              const dueDate = addMonths(new Date(data.startDate), i);
+              const dueDate = addMonths(startDate, i);
 
               batch.set(installmentDocRef, {
                   loanId: loanDocRef.id,
@@ -470,5 +473,3 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
     </Dialog>
   );
 }
-
-    
