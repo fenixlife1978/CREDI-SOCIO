@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useMemo } from "react";
 
 export default function PaymentsPage() {
     const firestore = useFirestore();
@@ -23,6 +25,11 @@ export default function PaymentsPage() {
     }, [firestore]);
     
     const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
+
+     const sortedPayments = useMemo(() => {
+      if (!payments) return [];
+      return [...payments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+    }, [payments]);
     
     const currencyFormatter = new Intl.NumberFormat('es-CO', {
         style: 'currency',
@@ -62,9 +69,10 @@ export default function PaymentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Socio</TableHead>
-                <TableHead>Préstamo ID</TableHead>
-                <TableHead>Monto</TableHead>
                 <TableHead className="hidden md:table-cell">Fecha de Pago</TableHead>
+                <TableHead>Capital</TableHead>
+                <TableHead>Interés</TableHead>
+                <TableHead>Monto Total</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -75,19 +83,21 @@ export default function PaymentsPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-[180px]" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
                     <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[120px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
                   </TableRow>
                 ))
               )}
-              {!isLoading && payments?.map((payment) => (
+              {!isLoading && sortedPayments?.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
-                  <TableCell>{payment.loanId}</TableCell>
-                  <TableCell>{currencyFormatter.format(payment.totalAmount)}</TableCell>
                   <TableCell className="hidden md:table-cell">{dateFormatter(payment.paymentDate)}</TableCell>
+                  <TableCell>{currencyFormatter.format(payment.capitalAmount)}</TableCell>
+                  <TableCell>{currencyFormatter.format(payment.interestAmount)}</TableCell>
+                  <TableCell className="font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -99,15 +109,14 @@ export default function PaymentsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuItem>Ver Recibo</DropdownMenuItem>
-                        <DropdownMenuItem>Editar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
-               {!isLoading && payments?.length === 0 && (
+               {!isLoading && sortedPayments?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     No se encontraron pagos.
                   </TableCell>
                 </TableRow>

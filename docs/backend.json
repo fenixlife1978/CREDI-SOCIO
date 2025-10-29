@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Partner": {
@@ -175,13 +176,23 @@
         "totalAmount": {
           "type": "number",
           "description": "The total amount paid in this payment."
+        },
+        "capitalAmount": {
+          "type": "number",
+          "description": "The capital amount portion of the payment."
+        },
+        "interestAmount": {
+          "type": "number",
+          "description": "The interest amount portion of the payment."
         }
       },
       "required": [
         "partnerId",
         "paymentDate",
         "installmentIds",
-        "totalAmount"
+        "totalAmount",
+        "capitalAmount",
+        "interestAmount"
       ]
     },
     "Receipt": {

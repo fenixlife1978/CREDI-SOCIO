@@ -61,17 +61,28 @@ function PaymentsReportTab() {
   );
   const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
 
-  const { filteredPayments, totalAmount } = useMemo(() => {
-    if (!payments) return { filteredPayments: [], totalAmount: 0 };
+  const { filteredPayments, totalAmount, totalCapital, totalInterest } = useMemo(() => {
+    if (!payments) return { filteredPayments: [], totalAmount: 0, totalCapital: 0, totalInterest: 0 };
     
     const filtered = payments.filter(p => {
       const paymentDate = parseISO(p.paymentDate);
       return getMonth(paymentDate) === selectedMonth && getYear(paymentDate) === selectedYear;
     });
 
-    const total = filtered.reduce((acc, p) => acc + p.totalAmount, 0);
+    const totals = filtered.reduce((acc, p) => {
+        acc.totalAmount += p.totalAmount;
+        acc.totalCapital += p.capitalAmount;
+        acc.totalInterest += p.interestAmount;
+        return acc;
+    }, { totalAmount: 0, totalCapital: 0, totalInterest: 0 });
 
-    return { filteredPayments: filtered, totalAmount: total };
+
+    return { 
+        filteredPayments: filtered, 
+        totalAmount: totals.totalAmount, 
+        totalCapital: totals.totalCapital,
+        totalInterest: totals.totalInterest
+    };
   }, [payments, selectedMonth, selectedYear]);
 
   return (
@@ -113,7 +124,9 @@ function PaymentsReportTab() {
             <TableRow>
               <TableHead>Socio</TableHead>
               <TableHead>Fecha de Pago</TableHead>
-              <TableHead className="text-right">Monto Pagado</TableHead>
+              <TableHead className="text-right">Capital Pagado</TableHead>
+              <TableHead className="text-right">Interés Pagado</TableHead>
+              <TableHead className="text-right">Monto Total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -121,12 +134,14 @@ function PaymentsReportTab() {
               <TableRow key={payment.id}>
                 <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
                 <TableCell>{format(parseISO(payment.paymentDate), 'dd/MM/yyyy')}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.totalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(payment.capitalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(payment.interestAmount)}</TableCell>
+                <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
               </TableRow>
             ))}
             {filteredPayments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center">
+                <TableCell colSpan={5} className="h-24 text-center">
                   No hay pagos registrados para este período.
                 </TableCell>
               </TableRow>
@@ -135,9 +150,15 @@ function PaymentsReportTab() {
         </Table>}
       </CardContent>
        {!isLoading && filteredPayments.length > 0 && (
-        <CardFooter className="justify-end">
+        <CardFooter className="flex-col items-end gap-2">
             <div className="text-lg font-semibold">
-                Total Recaudado: {currencyFormatter.format(totalAmount)}
+                Total Capital Recaudado: {currencyFormatter.format(totalCapital)}
+            </div>
+            <div className="text-lg font-semibold">
+                Total Interés Recaudado: {currencyFormatter.format(totalInterest)}
+            </div>
+            <div className="text-xl font-bold">
+                Total General Recaudado: {currencyFormatter.format(totalAmount)}
             </div>
         </CardFooter>
       )}
@@ -156,17 +177,28 @@ function UnpaidInstallmentsTab() {
   );
   const { data: installments, isLoading } = useCollection<Installment>(installmentsQuery);
 
-  const { filteredInstallments, totalUnpaid } = useMemo(() => {
-    if (!installments) return { filteredInstallments: [], totalUnpaid: 0 };
+  const { filteredInstallments, totalUnpaid, totalCapital, totalInterest } = useMemo(() => {
+    if (!installments) return { filteredInstallments: [], totalUnpaid: 0, totalCapital: 0, totalInterest: 0 };
     
     const filtered = installments.filter(i => {
       const dueDate = parseISO(i.dueDate);
       return getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear;
     });
 
-    const total = filtered.reduce((acc, i) => acc + i.totalAmount, 0);
+     const totals = filtered.reduce((acc, i) => {
+        acc.totalUnpaid += i.totalAmount;
+        acc.totalCapital += i.capitalAmount;
+        acc.totalInterest += i.interestAmount;
+        return acc;
+    }, { totalUnpaid: 0, totalCapital: 0, totalInterest: 0 });
 
-    return { filteredInstallments: filtered, totalUnpaid: total };
+
+    return { 
+        filteredInstallments: filtered, 
+        totalUnpaid: totals.totalUnpaid,
+        totalCapital: totals.totalCapital,
+        totalInterest: totals.totalInterest
+    };
   }, [installments, selectedMonth, selectedYear]);
 
   // Need partner names
@@ -218,7 +250,9 @@ function UnpaidInstallmentsTab() {
               <TableHead>Socio</TableHead>
               <TableHead>Fecha Vencimiento</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Monto Pendiente</TableHead>
+              <TableHead className="text-right">Capital Pendiente</TableHead>
+              <TableHead className="text-right">Interés Pendiente</TableHead>
+              <TableHead className="text-right">Monto Total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -231,12 +265,14 @@ function UnpaidInstallmentsTab() {
                         {installment.status}
                     </Badge>
                 </TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(installment.totalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
+                <TableCell className="text-right font-semibold">{currencyFormatter.format(installment.totalAmount)}</TableCell>
               </TableRow>
             ))}
             {filteredInstallments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No hay cuotas sin pagar para este período.
                 </TableCell>
               </TableRow>
@@ -245,9 +281,15 @@ function UnpaidInstallmentsTab() {
         </Table>}
       </CardContent>
        {!isLoading && filteredInstallments.length > 0 && (
-        <CardFooter className="justify-end">
+        <CardFooter className="flex-col items-end gap-2">
             <div className="text-lg font-semibold">
-                Total por Cobrar: {currencyFormatter.format(totalUnpaid)}
+                Total Capital por Cobrar: {currencyFormatter.format(totalCapital)}
+            </div>
+             <div className="text-lg font-semibold">
+                Total Interés por Cobrar: {currencyFormatter.format(totalInterest)}
+            </div>
+            <div className="text-xl font-bold">
+                Total General por Cobrar: {currencyFormatter.format(totalUnpaid)}
             </div>
         </CardFooter>
       )}

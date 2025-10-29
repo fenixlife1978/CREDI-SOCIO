@@ -1,3 +1,4 @@
+
 // This file now defines the data structures (types) for the application.
 // The actual data will be fetched from Firestore.
 
@@ -34,6 +35,8 @@ export type Payment = {
   installmentIds: string[];
   paymentDate: string; // ISO string
   totalAmount: number;
+  capitalAmount: number;
+  interestAmount: number;
   
   // Optional: For display purposes
   partnerName?: string;

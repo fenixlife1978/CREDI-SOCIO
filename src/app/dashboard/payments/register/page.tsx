@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -264,6 +265,8 @@ export default function RegisterPaymentPage() {
             installmentIds: [inst.id], // One payment record per installment for simplicity
             paymentDate,
             totalAmount: inst.totalAmount,
+            capitalAmount: inst.capitalAmount,
+            interestAmount: inst.interestAmount,
             partnerName,
         });
 
