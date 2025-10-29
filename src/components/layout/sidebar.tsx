@@ -18,6 +18,7 @@ import {
   LogOut,
   Sun,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/dashboard/partners', label: 'Socios', icon: Users },
   { href: '/dashboard/loans', label: 'Préstamos', icon: Landmark },
   { href: '/dashboard/payments/register', label: 'Pagos', icon: DollarSign },
+  { href: '/dashboard/reports', label: 'Reportes', icon: FileText },
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldCheck },
 ];
 
