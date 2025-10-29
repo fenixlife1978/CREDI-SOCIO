@@ -1,15 +1,18 @@
 'use client';
 
-import { getFirebaseApp } from './config';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
+import { firebaseConfig } from './config';
 
-// Initialize Firebase App on the client
-const firebaseApp = getFirebaseApp();
+// Safe initialize on the client
+const firebaseApp: FirebaseApp = !getApps().length
+  ? initializeApp(firebaseConfig)
+  : getApp();
 
 // Initialize and export client-side instances of Firebase services
-export const firestore: Firestore = getFirestore(firebaseApp);
-export const auth: Auth = getAuth(firebaseApp);
+const firestore: Firestore = getFirestore(firebaseApp);
+const auth: Auth = getAuth(firebaseApp);
 
-// Re-export firebaseApp for convenience if needed elsewhere on the client
-export { firebaseApp };
+// Re-export for convenience
+export { firebaseApp, firestore, auth };

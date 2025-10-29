@@ -10,7 +10,8 @@ export const firebaseConfig = {
 };
 
 // Helper function to initialize Firebase, safe for both server and client.
-export const getFirebaseApp = (): FirebaseApp => {
+// This function is NOT directly called by client-side code anymore to prevent issues.
+export function initializeFirebaseApp(): FirebaseApp {
   if (!getApps().length) {
     return initializeApp(firebaseConfig);
   } else {
