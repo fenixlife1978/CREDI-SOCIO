@@ -231,11 +231,15 @@
     "Report": {
       "title": "Report",
       "type": "object",
-      "description": "Represents a financial report.",
+      "description": "Represents a financial report, which can be filtered by different criteria.",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique identifier for the Report entity."
+        },
+        "reportType": {
+          "type": "string",
+          "description": "The type of report, e.g., 'payments', 'unpaid_installments'."
         },
         "startDate": {
           "type": "string",
@@ -247,26 +251,20 @@
           "description": "The end date for the report period.",
           "format": "date-time"
         },
-        "capitalLoaned": {
+        "totalAmount": {
           "type": "number",
-          "description": "The total capital loaned during the period."
+          "description": "The total amount calculated for the report (e.g., total payments, total unpaid)."
         },
-        "capitalRecovered": {
-          "type": "number",
-          "description": "The total capital recovered during the period."
-        },
-        "interestEarned": {
-          "type": "number",
-          "description": "The total interest earned during the period."
+        "generatedDate": {
+          "type": "string",
+          "description": "The date when the report was generated.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
-        "startDate",
-        "endDate",
-        "capitalLoaned",
-        "capitalRecovered",
-        "interestEarned"
+        "reportType",
+        "generatedDate"
       ]
     }
   },
@@ -277,28 +275,40 @@
   },
   "firestore": {
     "/partners/{partnerId}": {
-        "schema": { "$ref": "#/entities/Partner" },
-        "description": "Stores partner information. Each document represents a partner in the lending system."
+      "schema": {
+        "$ref": "#/entities/Partner"
+      },
+      "description": "Stores partner information. Each document represents a partner in the lending system."
     },
     "/loans/{loanId}": {
-        "schema": { "$ref": "#/entities/Loan" },
-        "description": "Stores loan information associated with a partner."
+      "schema": {
+        "$ref": "#/entities/Loan"
+      },
+      "description": "Stores loan information associated with a partner."
     },
     "/installments/{installmentId}": {
-        "schema": { "$ref": "#/entities/Installment" },
-        "description": "Stores installment information associated with a loan. This collection can be a subcollection of loans for better data organization, e.g., /loans/{loanId}/installments/{installmentId}."
+      "schema": {
+        "$ref": "#/entities/Installment"
+      },
+      "description": "Stores installment information associated with a loan. This collection can be a subcollection of loans for better data organization, e.g., /loans/{loanId}/installments/{installmentId}."
     },
     "/payments/{paymentId}": {
-        "schema": { "$ref": "#/entities/Payment" },
-        "description": "Stores payment information associated with a partner."
+      "schema": {
+        "$ref": "#/entities/Payment"
+      },
+      "description": "Stores payment information associated with a partner."
     },
     "/receipts/{receiptId}": {
-        "schema": { "$ref": "#/entities/Receipt" },
-        "description": "Stores receipt information associated with a payment."
+      "schema": {
+        "$ref": "#/entities/Receipt"
+      },
+      "description": "Stores receipt information associated with a payment."
     },
     "/reports/{reportId}": {
-        "schema": { "$ref": "#/entities/Report" },
-        "description": "Stores financial report data."
+      "schema": {
+        "$ref": "#/entities/Report"
+      },
+      "description": "Stores generated financial report data."
     }
   }
 }
