@@ -46,7 +46,6 @@ export default function LoansPage() {
 
   const sortedLoans = useMemo(() => {
     if (!loans) return [];
-    // No filtering here, just sorting. All loans will be displayed.
     return [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [loans]);
 
@@ -119,13 +118,12 @@ export default function LoansPage() {
     try {
       const batch = writeBatch(firestore);
       
-      // The filtering logic is ONLY here, for the delete action.
-      const loansToDelete = loans.filter(loan => loan.partnerName !== 'ALEXANDER BRICEÑO');
+      const loansToDelete = loans;
 
       if (loansToDelete.length === 0) {
         toast({
           title: 'Nada que eliminar',
-          description: 'No hay préstamos para eliminar (excepto el de ALEXANDER BRICEÑO).',
+          description: 'No hay préstamos para eliminar.',
         });
         setIsClearAllAlertOpen(false);
         return;
@@ -466,8 +464,7 @@ export default function LoansPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive"/>¿Estás absolutamente seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción es irreversible. Se eliminarán permanentemente todos los préstamos y sus cuotas, 
-              <span className="font-bold"> excepto</span> los que pertenezcan a <span className="font-bold">ALEXANDER BRICEÑO</span>. 
+              Esta acción es irreversible. Se eliminarán permanentemente todos los préstamos y sus cuotas. 
               No podrás recuperar estos datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -477,7 +474,7 @@ export default function LoansPage() {
               onClick={handleClearAllConfirm}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              Sí, eliminar todo lo demás
+              Sí, eliminar todo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
