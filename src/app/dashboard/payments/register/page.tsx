@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, writeBatch, getDocs, doc } from 'firebase/firestore';
 import type { Installment, Partner, Loan } from '@/lib/data';
-import { getMonth, getYear, parseISO, format } from 'date-fns';
+import { getMonth, getYear, parseISO, format, set, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,126 @@ const months = Array.from({ length: 12 }, (_, i) => ({
 
 const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
 
+
+function InstallmentsTable({
+  title,
+  installments,
+  partnersMap,
+  selectedInstallments,
+  handleSelectAll,
+  handleSelectRow,
+  currencyFormatter,
+  isLoading
+}: {
+  title: string;
+  installments: Installment[];
+  partnersMap: Map<string, string>;
+  selectedInstallments: Record<string, boolean>;
+  handleSelectAll: (checked: boolean) => void;
+  handleSelectRow: (id: string, checked: boolean) => void;
+  currencyFormatter: Intl.NumberFormat;
+  isLoading: boolean;
+}) {
+  const totals = useMemo(() => {
+    return installments.reduce(
+      (acc, inst) => {
+        acc.capital += inst.capitalAmount;
+        acc.interest += inst.interestAmount;
+        acc.total += inst.totalAmount;
+        return acc;
+      },
+      { capital: 0, interest: 0, total: 0 }
+    );
+  }, [installments]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="relative w-full overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead padding="checkbox" className="w-12">
+                  <Checkbox
+                    onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+                    checked={
+                      installments.length > 0 &&
+                      installments.every(inst => selectedInstallments[inst.id])
+                    }
+                    aria-label="Seleccionar todo"
+                  />
+                </TableHead>
+                <TableHead>Socio</TableHead>
+                <TableHead># Cuota</TableHead>
+                <TableHead>Fecha Vencimiento</TableHead>
+                <TableHead className="text-right">Capital</TableHead>
+                <TableHead className="text-right">Interés</TableHead>
+                <TableHead className="text-right">Monto Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading &&
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
+                  </TableRow>
+                ))}
+              {!isLoading && installments.length > 0 &&
+                installments.map((installment) => (
+                  <TableRow
+                    key={installment.id}
+                    data-state={selectedInstallments[installment.id] && 'selected'}
+                  >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectedInstallments[installment.id] || false}
+                        onCheckedChange={(checked) => handleSelectRow(installment.id, Boolean(checked))}
+                        aria-label={`Seleccionar cuota ${installment.installmentNumber}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || 'Socio no encontrado'}</TableCell>
+                    <TableCell>{installment.installmentNumber}</TableCell>
+                    <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
+                    <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
+                    <TableCell className="text-right font-medium">{currencyFormatter.format(installment.totalAmount)}</TableCell>
+                  </TableRow>
+                ))}
+              {!isLoading && installments.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    No hay cuotas en esta categoría.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+            {!isLoading && installments.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={4} className="font-bold">Totales</TableCell>
+                  <TableCell className="text-right font-bold">{currencyFormatter.format(totals.capital)}</TableCell>
+                  <TableCell className="text-right font-bold">{currencyFormatter.format(totals.interest)}</TableCell>
+                  <TableCell className="text-right font-bold">{currencyFormatter.format(totals.total)}</TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
 export default function RegisterPaymentPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -35,7 +155,7 @@ export default function RegisterPaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const installmentsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'pending')) : null),
+    () => (firestore ? query(collection(firestore, 'installments'), where('status', 'in', ['pending', 'overdue'])) : null),
     [firestore]
   );
   const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
@@ -56,32 +176,41 @@ export default function RegisterPaymentPage() {
     return new Map(loans.map(l => [l.id, l]));
   }, [loans]);
 
-  const filteredInstallments = useMemo(() => {
-    if (!installments) return [];
-    return installments.filter(inst => {
+  const { currentMonthInstallments, overdueInstallments } = useMemo(() => {
+    if (!installments) return { currentMonthInstallments: [], overdueInstallments: [] };
+    
+    const startOfSelectedMonth = new Date(selectedYear, selectedMonth, 1);
+    
+    const current: Installment[] = [];
+    const overdue: Installment[] = [];
+
+    installments.forEach(inst => {
       const dueDate = parseISO(inst.dueDate);
-      return getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear;
+      if (getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear) {
+        current.push(inst);
+      } else if (isBefore(dueDate, startOfSelectedMonth) && inst.status === 'overdue') {
+        overdue.push(inst);
+      }
     });
+
+    return { 
+      currentMonthInstallments: current.sort((a,b) => parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime()), 
+      overdueInstallments: overdue.sort((a,b) => parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime()),
+    };
   }, [installments, selectedMonth, selectedYear]);
 
-  const totals = useMemo(() => {
-    return filteredInstallments.reduce(
-      (acc, inst) => {
-        acc.capital += inst.capitalAmount;
-        acc.interest += inst.interestAmount;
-        acc.total += inst.totalAmount;
-        return acc;
-      },
-      { capital: 0, interest: 0, total: 0 }
-    );
-  }, [filteredInstallments]);
-
-  const handleSelectAll = (checked: boolean) => {
-    const newSelection: Record<string, boolean> = {};
-    if (checked) {
-      for (const inst of filteredInstallments) {
-        newSelection[inst.id] = true;
-      }
+  const handleSelectAllCurrent = (checked: boolean) => {
+    const newSelection = { ...selectedInstallments };
+    for (const inst of currentMonthInstallments) {
+      newSelection[inst.id] = checked;
+    }
+    setSelectedInstallments(newSelection);
+  };
+  
+  const handleSelectAllOverdue = (checked: boolean) => {
+    const newSelection = { ...selectedInstallments };
+    for (const inst of overdueInstallments) {
+      newSelection[inst.id] = checked;
     }
     setSelectedInstallments(newSelection);
   };
@@ -110,12 +239,18 @@ export default function RegisterPaymentPage() {
 
     try {
       const batch = writeBatch(firestore);
-      const paymentDate = new Date().toISOString();
       const installmentsToUpdate = installments.filter(inst => installmentIdsToProcess.includes(inst.id));
 
       const loanStatusCheck: Record<string, boolean> = {};
 
       for (const inst of installmentsToUpdate) {
+        // Calculate payment date based on user's logic
+        const originalDueDate = parseISO(inst.dueDate);
+        const paymentDate = set(originalDueDate, {
+            month: selectedMonth,
+            year: selectedYear
+        }).toISOString();
+        
         // 1. Mark installment as paid
         const installmentRef = doc(firestore, 'installments', inst.id);
         batch.update(installmentRef, { status: 'paid', paymentDate });
@@ -138,15 +273,10 @@ export default function RegisterPaymentPage() {
 
       // 3. Check if any loans are now fully paid off
       for (const loanId of Object.keys(loanStatusCheck)) {
-          const loan = loansMap.get(loanId);
-          if (!loan) continue;
+          const allInstallmentsForLoanQuery = query(collection(firestore, 'installments'), where('loanId', '==', loanId));
+          const allInstallmentsForLoanSnapshot = await getDocs(allInstallmentsForLoanQuery);
 
-          // Check if ALL installments for this loan will be 'paid' after this batch
-          const allInstallmentsForLoan = await getDocs(
-              query(collection(firestore, 'installments'), where('loanId', '==', loanId))
-          );
-
-          const allPaid = allInstallmentsForLoan.docs.every(docSnap => {
+          const allPaid = allInstallmentsForLoanSnapshot.docs.every(docSnap => {
               const installmentId = docSnap.id;
               // Is it part of the current batch being paid?
               if (installmentIdsToProcess.includes(installmentId)) return true;
@@ -276,110 +406,45 @@ export default function RegisterPaymentPage() {
           </Select>
         </div>
       </div>
+        
+        <InstallmentsTable
+            title={`Cuotas para ${months.find(m => m.value === selectedMonth)?.label} de ${selectedYear}`}
+            installments={currentMonthInstallments}
+            partnersMap={partnersMap}
+            selectedInstallments={selectedInstallments}
+            handleSelectAll={handleSelectAllCurrent}
+            handleSelectRow={handleSelectRow}
+            currencyFormatter={currencyFormatter}
+            isLoading={isLoading}
+        />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle>Cuotas Pendientes para {months.find(m => m.value === selectedMonth)?.label} de {selectedYear}</CardTitle>
-                <CardDescription>Marca las cuotas que han sido pagadas y procesa el pago.</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleCleanOrphanInstallments} disabled={isCleaning}>
-                {isCleaning ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Limpiar Cuotas Huérfanas
-            </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="relative w-full overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead padding="checkbox" className="w-12">
-                    <Checkbox
-                      onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
-                      checked={
-                        filteredInstallments.length > 0 &&
-                        Object.values(selectedInstallments).filter(Boolean).length === filteredInstallments.length
-                      }
-                      aria-label="Seleccionar todo"
-                    />
-                  </TableHead>
-                  <TableHead>Socio</TableHead>
-                  <TableHead># Cuota</TableHead>
-                  <TableHead>Fecha Vencimiento</TableHead>
-                  <TableHead className="text-right">Capital</TableHead>
-                  <TableHead className="text-right">Interés</TableHead>
-                  <TableHead className="text-right">Monto Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[100px] ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                )}
-                {!isLoading && filteredInstallments.length > 0 && filteredInstallments.map((installment) => (
-                  <TableRow
-                    key={installment.id}
-                    data-state={selectedInstallments[installment.id] && 'selected'}
-                  >
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={selectedInstallments[installment.id] || false}
-                        onCheckedChange={(checked) => handleSelectRow(installment.id, Boolean(checked))}
-                        aria-label={`Seleccionar cuota ${installment.installmentNumber} de ${partnersMap.get(installment.partnerId)}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || 'Socio no encontrado'}</TableCell>
-                    <TableCell>{installment.installmentNumber}</TableCell>
-                    <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
-                    <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
-                    <TableCell className="text-right font-medium">{currencyFormatter.format(installment.totalAmount)}</TableCell>
-                  </TableRow>
-                ))}
-                {!isLoading && filteredInstallments.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                      No hay cuotas pendientes para el período seleccionado.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-              {!isLoading && filteredInstallments.length > 0 && (
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={4} className="font-bold">Totales</TableCell>
-                    <TableCell className="text-right font-bold">{currencyFormatter.format(totals.capital)}</TableCell>
-                    <TableCell className="text-right font-bold">{currencyFormatter.format(totals.interest)}</TableCell>
-                    <TableCell className="text-right font-bold">{currencyFormatter.format(totals.total)}</TableCell>
-                  </TableRow>
-                </TableFooter>
-              )}
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        <InstallmentsTable
+            title="Cuotas por pagar Meses Anteriores"
+            installments={overdueInstallments}
+            partnersMap={partnersMap}
+            selectedInstallments={selectedInstallments}
+            handleSelectAll={handleSelectAllOverdue}
+            handleSelectRow={handleSelectRow}
+            currencyFormatter={currencyFormatter}
+            isLoading={isLoading}
+        />
 
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => router.back()}>Cancelar</Button>
-        <Button 
-          onClick={handleProcessPayments}
-          disabled={isProcessing || Object.values(selectedInstallments).every(v => !v)}
-        >
-          {isProcessing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-          Procesar Pagos Seleccionados
+      <div className="flex justify-between items-center gap-2">
+        <Button variant="outline" size="sm" onClick={handleCleanOrphanInstallments} disabled={isCleaning}>
+            {isCleaning ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            Limpiar Cuotas Huérfanas
         </Button>
+        <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => router.back()}>Cancelar</Button>
+            <Button 
+            onClick={handleProcessPayments}
+            disabled={isProcessing || Object.values(selectedInstallments).every(v => !v)}
+            >
+            {isProcessing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+            Procesar Pagos Seleccionados
+            </Button>
+        </div>
       </div>
     </div>
   );
 }
-
-    

@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, doc, deleteDoc, writeBatch, getDocs, where } from "firebase/firestore";
-import type { Loan, Partner, Installment } from "@/lib/data";
+import type { Loan, Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AddLoanDialog } from "./add-loan-dialog";
