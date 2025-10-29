@@ -403,7 +403,7 @@ export default function LoansPage() {
                       <TableCell className="hidden md:table-cell">{!isNaN(loan.numberOfInstallments) ? loan.numberOfInstallments : '-'}</TableCell>
                       <TableCell className="hidden md:table-cell">{!isNaN(loan.interestRate) ? `${loan.interestRate}%` : '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={loan.status === 'Paid Off' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
+                        <Badge variant={loan.status === 'Finalizado' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
                           {loan.status}
                         </Badge>
                       </TableCell>

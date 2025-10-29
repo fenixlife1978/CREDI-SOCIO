@@ -142,7 +142,7 @@ export default function LoanDetailPage() {
                 </div>
                 <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">Estado</p>
-                    <Badge variant={loan.status === 'Paid Off' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
+                    <Badge variant={loan.status === 'Finalizado' ? 'secondary' : loan.status === 'Overdue' ? 'destructive' : 'default'}>
                         {loan.status}
                     </Badge>
                 </div>

@@ -69,7 +69,7 @@ export function OverviewChart() {
 
         if (monthIndex >= 0 && monthIndex < 6) {
           monthlyData[monthIndex].lent += loan.totalAmount;
-          if (loan.status === 'Paid Off') {
+          if (loan.status === 'Finalizado') {
             monthlyData[monthIndex].recovered += loan.totalAmount;
           }
         }

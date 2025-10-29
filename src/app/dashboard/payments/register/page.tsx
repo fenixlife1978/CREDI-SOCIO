@@ -156,7 +156,7 @@ export default function RegisterPaymentPage() {
           
           if (allPaid) {
               const loanRef = doc(firestore, 'loans', loanId);
-              batch.update(loanRef, { status: 'Paid Off' });
+              batch.update(loanRef, { status: 'Finalizado' });
           }
       }
 

@@ -20,7 +20,7 @@ export type Loan = {
   numberOfInstallments: number;
   interestRate: number;
   startDate: string; // Should be an ISO string
-  status: 'Active' | 'Paid Off' | 'Overdue';
+  status: 'Active' | 'Finalizado' | 'Overdue';
   
   // Optional: For displaying partner info directly on the loan
   partnerName?: string; 

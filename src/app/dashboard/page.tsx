@@ -67,7 +67,7 @@ export default function DashboardPage() {
     return loans.reduce((acc, loan) => {
         const interest = loan.totalAmount * (loan.interestRate / 100);
         acc.totalLent += loan.totalAmount;
-        if (loan.status === 'Paid Off') {
+        if (loan.status === 'Finalizado') {
             acc.totalInterest += interest;
         }
         if (loan.status === 'Active' || loan.status === 'Overdue') {
