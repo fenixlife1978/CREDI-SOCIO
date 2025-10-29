@@ -1,25 +1,37 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
+
+// --- Singleton Pattern for Firebase Initialization ---
+let firebaseApp: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
+
+function initializeFirebaseServices() {
+  if (!getApps().length) {
+    firebaseApp = initializeApp(firebaseConfig);
+  } else {
+    firebaseApp = getApp();
+  }
+  auth = getAuth(firebaseApp);
+  firestore = getFirestore(firebaseApp);
+}
+
+// Immediately initialize the services
+initializeFirebaseServices();
+// --- End Singleton Pattern ---
+
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  if (!getApps().length) {
-    const firebaseApp = initializeApp(firebaseConfig);
-    return getSdks(firebaseApp);
-  }
-
-  return getSdks(getApp());
-}
-
-export function getSdks(firebaseApp: FirebaseApp) {
+  // This function now simply returns the already initialized services.
   return {
     firebaseApp,
-    firestore: getFirestore(firebaseApp),
-    auth: getAuth(firebaseApp)
+    firestore,
+    auth
   };
 }
 
