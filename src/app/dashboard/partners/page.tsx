@@ -13,6 +13,7 @@ import type { Partner, Loan, Installment } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
+import { AddPartnerDialog } from "./add-partner-dialog";
 
 export default function PartnersPage() {
   const firestore = useFirestore();
@@ -21,6 +22,7 @@ export default function PartnersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
+  const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
 
   const partnersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -169,6 +171,8 @@ export default function PartnersPage() {
 
   return (
     <>
+      <AddPartnerDialog isOpen={isPartnerDialogOpen} setIsOpen={setIsPartnerDialogOpen} />
+
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-2">
           <h1 className="font-semibold text-lg md:text-2xl">Socios</h1>
@@ -184,7 +188,7 @@ export default function PartnersPage() {
               <Upload className="h-4 w-4 mr-2" />
               {isImporting ? 'Importando...' : 'Importar'}
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={() => setIsPartnerDialogOpen(true)}>
               <PlusCircle className="h-4 w-4 mr-2" />
               Añadir Socio
             </Button>
