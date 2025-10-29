@@ -9,13 +9,11 @@ export const firebaseConfig = {
   "messagingSenderId": "318145535367"
 };
 
-// Helper function to initialize Firebase
-function initializeFirebaseApp(): FirebaseApp {
+// Helper function to initialize Firebase, safe for both server and client.
+export const getFirebaseApp = (): FirebaseApp => {
   if (!getApps().length) {
     return initializeApp(firebaseConfig);
   } else {
     return getApp();
   }
-}
-
-export const firebaseApp = initializeFirebaseApp();
+};
