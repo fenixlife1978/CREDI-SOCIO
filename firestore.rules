@@ -1,28 +1,40 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset configures open read and write access to all collections in the database.
- *   This is suitable for prototyping and internal tools where data access is not restricted.
- * @data-structure
- *   - /partners/{partnerId}
- *   - /loans/{loanId}
- *   - /installments/{installmentId}
- *   - /payments/{paymentId}
- *   - /receipts/{receiptId}
- *   - /reports/{reportId}
- *   - /anomalies/{anomalyId}
- * @key-security-decisions
- *   - Public read and write access to all collections.
+ * @fileOverview Firestore Security Rules for the Lending System.
+ *
+ * Core Philosophy:
+ * This ruleset is designed for prototyping an internal tool with trusted users.
+ * It provides open read and write access to all collections, reflecting the
+ * provided reasoning that authentication is handled at the application level and all
+ * users are trusted.
+ *
+ * Data Structure:
+ * All collections reside at the root level:
+ * - /partners/{partnerId}
+ * - /loans/{loanId}
+ * - /installments/{installmentId}
+ * - /payments/{paymentId}
+ * - /receipts/{receiptId}
+ * - /reports/{reportId}
+ *
+ * Key Security Decisions:
+ * - All users, authenticated or not, have read and write access to all collections.
+ * - No user-specific authorization is enforced at the Firestore level.
+ *
+ * WARNING: These rules are not suitable for production environments where
+ * untrusted users may have access.  Implement proper authentication and
+ * authorization mechanisms before deploying to production.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any user to read or write Partner documents.
+     * @description Allows any user to read and write partner data.
      * @path /partners/{partnerId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Partner document.
-     * @deny None.
-     * @principle Allows open read and write access.
+     * @allow (get, list) - Any user can read partner data.
+     * @allow (create, update, delete) - Any user can create, update, or delete partner data.
+     * @deny none
+     * @principle Open read and write access for prototyping.
      */
     match /partners/{partnerId} {
       allow get, list: if true;
@@ -30,11 +42,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any user to read or write Loan documents.
+     * @description Allows any user to read and write loan data.
      * @path /loans/{loanId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Loan document.
-     * @deny None.
-     * @principle Allows open read and write access.
+     * @allow (get, list) - Any user can read loan data.
+     * @allow (create, update, delete) - Any user can create, update, or delete loan data.
+     * @deny none
+     * @principle Open read and write access for prototyping.
      */
     match /loans/{loanId} {
       allow get, list: if true;
@@ -42,11 +55,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any user to read or write Installment documents.
+     * @description Allows any user to read and write installment data.
      * @path /installments/{installmentId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Installment document.
-     * @deny None.
-     * @principle Allows open read and write access.
+     * @allow (get, list) - Any user can read installment data.
+     * @allow (create, update, delete) - Any user can create, update, or delete installment data.
+     * @deny none
+     * @principle Open read and write access for prototyping.
      */
     match /installments/{installmentId} {
       allow get, list: if true;
@@ -54,11 +68,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any user to read or write Payment documents.
+     * @description Allows any user to read and write payment data.
      * @path /payments/{paymentId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Payment document.
-     * @deny None.
-     * @principle Allows open read and write access.
+     * @allow (get, list) - Any user can read payment data.
+     * @allow (create, update, delete) - Any user can create, update, or delete payment data.
+     * @deny none
+     * @principle Open read and write access for prototyping.
      */
     match /payments/{paymentId} {
       allow get, list: if true;
@@ -66,11 +81,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any user to read or write Receipt documents.
+     * @description Allows any user to read and write receipt data.
      * @path /receipts/{receiptId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Receipt document.
-     * @deny None.
-     * @principle Allows open read and write access.
+     * @allow (get, list) - Any user can read receipt data.
+     * @allow (create, update, delete) - Any user can create, update, or delete receipt data.
+     * @deny none
+     * @principle Open read and write access for prototyping.
      */
     match /receipts/{receiptId} {
       allow get, list: if true;
@@ -78,25 +94,14 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any user to read or write Report documents.
+     * @description Allows any user to read and write report data.
      * @path /reports/{reportId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Report document.
-     * @deny None.
-     * @principle Allows open read and write access.
+     * @allow (get, list) - Any user can read report data.
+     * @allow (create, update, delete) - Any user can create, update, or delete report data.
+     * @deny none
+     * @principle Open read and write access for prototyping.
      */
     match /reports/{reportId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
-    }
-
-    /**
-     * @description Allows any user to read or write Anomaly documents.
-     * @path /anomalies/{anomalyId}
-     * @allow (get, list, create, update, delete) Any authenticated user can read/write any Anomaly document.
-     * @deny None.
-     * @principle Allows open read and write access.
-     */
-    match /anomalies/{anomalyId} {
       allow get, list: if true;
       allow create, update, delete: if true;
     }
