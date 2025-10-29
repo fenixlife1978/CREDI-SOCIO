@@ -118,7 +118,7 @@ export default function LoansPage() {
     try {
       const batch = writeBatch(firestore);
       
-      const loansToDelete = loans;
+      const loansToDelete = loans; // Delete all loans
 
       if (loansToDelete.length === 0) {
         toast({
@@ -238,7 +238,7 @@ export default function LoansPage() {
               loanType: (row['Tipo de Préstamo'] || 'standard').toLowerCase() as 'standard' | 'custom',
               numberOfInstallments: parseInt(row['Plazo (cuotas)'] || '0', 10),
               interestRate: getInterestRate(),
-              fixedInterestAmount: parseFloat(row['Interes Fijo'] || '0'),
+              fixedInterestAmount: parseFloat(row['Interes Fijo'] || '0') || null,
               status: row['Estado'] || 'Active',
             };
             batch.set(newLoanDocRef, loanData);
@@ -351,7 +351,7 @@ export default function LoansPage() {
             <Button size="sm" onClick={openNewDialog}>
               Añadir Préstamo
             </Button>
-             <Button variant="destructive" size="sm" onClick={() => setIsClearAllAlertOpen(true)} disabled={isLoading}>
+             <Button variant="destructive" size="sm" onClick={() => setIsClearAllAlertOpen(true)} disabled={isLoading || isImporting}>
               <Trash2 className="h-4 w-4 mr-2" />
               Eliminar Todos
             </Button>
@@ -486,3 +486,5 @@ export default function LoansPage() {
     </>
   );
 }
+
+    

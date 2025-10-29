@@ -102,7 +102,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
         interestRate: loanToEdit.interestRate,
         numberOfInstallments: loanToEdit.numberOfInstallments,
         startDate: format(parseISO(loanToEdit.startDate), 'yyyy-MM-dd'),
-        fixedInterestAmount: loanToEdit.fixedInterestAmount,
+        fixedInterestAmount: loanToEdit.fixedInterestAmount || 0,
         hasTerm: loanToEdit.numberOfInstallments > 0 ? 'yes' : 'no',
       });
     } else {
@@ -140,7 +140,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
             partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
             numberOfInstallments: data.numberOfInstallments ?? 0,
             interestRate: data.interestRate ?? 0,
-            fixedInterestAmount: data.fixedInterestAmount,
+            fixedInterestAmount: data.fixedInterestAmount ?? null,
         };
 
         await updateDoc(loanDocRef, loanData);
@@ -166,7 +166,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
           status: 'Active',
           numberOfInstallments: data.numberOfInstallments ?? 0,
           interestRate: data.interestRate ?? 0,
-          fixedInterestAmount: data.loanType === 'custom' ? data.fixedInterestAmount : undefined,
+          fixedInterestAmount: data.loanType === 'custom' ? data.fixedInterestAmount ?? 0 : null,
         };
         batch.set(loanDocRef, loanData);
     
@@ -470,3 +470,5 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
     </Dialog>
   );
 }
+
+    
