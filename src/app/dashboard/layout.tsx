@@ -5,15 +5,12 @@ import { AppHeader } from '@/components/layout/header';
 import { useAuth } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { FirebaseClientProvider, useFirebaseLoading } from '@/firebase/client-provider';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
+  const isFirebaseLoading = useFirebaseLoading();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -21,21 +18,32 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, router]);
 
-  if (!isAuthenticated) {
-    return null; // O un componente de carga
+  if (!isAuthenticated || isFirebaseLoading) {
+    return null; // Or a loading spinner
   }
 
   return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <AppHeader />
+        <main className="flex-1 p-4 sm:p-6 bg-background overflow-auto">
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
     <FirebaseClientProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <AppHeader />
-          <main className="flex-1 p-4 sm:p-6 bg-background overflow-auto">
-            {children}
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
+      <DashboardContent>{children}</DashboardContent>
     </FirebaseClientProvider>
   );
 }

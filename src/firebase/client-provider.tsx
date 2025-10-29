@@ -1,9 +1,13 @@
 'use client';
 
-import React, { type ReactNode, useEffect, useState, useMemo } from 'react';
+import React, { type ReactNode, useEffect, useState, useMemo, createContext, useContext } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
 import { getAuth, onAuthStateChanged, signInAnonymously, type User, type Auth } from 'firebase/auth';
+
+const FirebaseLoadingContext = createContext<boolean>(true);
+
+export const useFirebaseLoading = () => useContext(FirebaseLoadingContext);
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -39,14 +43,15 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     }
   }, [firebaseApp]);
 
-
   return (
-    <FirebaseProvider
-      firebaseApp={firebaseApp}
-      firestore={firestore}
-      auth={auth} 
-    >
-      {children}
-    </FirebaseProvider>
+    <FirebaseLoadingContext.Provider value={isLoading}>
+      <FirebaseProvider
+        firebaseApp={firebaseApp}
+        firestore={firestore}
+        auth={auth} 
+      >
+        {children}
+      </FirebaseProvider>
+    </FirebaseLoadingContext.Provider>
   );
 }
