@@ -1,7 +1,6 @@
 {
   "entities": {
     "Partner": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Partner",
       "type": "object",
       "description": "Represents a member or partner in the lending system.",
@@ -41,13 +40,11 @@
         }
       },
       "required": [
-        "id",
         "firstName",
         "lastName"
       ]
     },
     "Loan": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Loan",
       "type": "object",
       "description": "Represents a loan issued to a partner.",
@@ -83,7 +80,6 @@
         }
       },
       "required": [
-        "id",
         "partnerId",
         "loanType",
         "totalAmount",
@@ -93,7 +89,6 @@
       ]
     },
     "Installment": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Installment",
       "type": "object",
       "description": "Represents an installment for a loan.",
@@ -142,7 +137,6 @@
         }
       },
       "required": [
-        "id",
         "loanId",
         "partnerId",
         "installmentNumber",
@@ -154,7 +148,6 @@
       ]
     },
     "Payment": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Payment",
       "type": "object",
       "description": "Represents a payment made for one or more installments.",
@@ -185,7 +178,6 @@
         }
       },
       "required": [
-        "id",
         "partnerId",
         "paymentDate",
         "installmentIds",
@@ -193,7 +185,6 @@
       ]
     },
     "Receipt": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Receipt",
       "type": "object",
       "description": "Represents a receipt generated for a payment.",
@@ -229,7 +220,6 @@
         }
       },
       "required": [
-        "id",
         "paymentId",
         "installmentId",
         "generationDate",
@@ -239,7 +229,6 @@
       ]
     },
     "Report": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Report",
       "type": "object",
       "description": "Represents a financial report.",
@@ -287,68 +276,29 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/partners/{partnerId}",
-        "definition": {
-          "entityName": "Partner",
-          "schema": {
-            "$ref": "#/backend/entities/Partner"
-          },
-          "description": "Stores partner information. Each document represents a partner in the lending system."
-        }
-      },
-      {
-        "path": "/loans/{loanId}",
-        "definition": {
-          "entityName": "Loan",
-          "schema": {
-            "$ref": "#/backend/entities/Loan"
-          },
-          "description": "Stores loan information associated with a partner."
-        }
-      },
-      {
-        "path": "/installments/{installmentId}",
-        "definition": {
-          "entityName": "Installment",
-          "schema": {
-            "$ref": "#/backend/entities/Installment"
-          },
-          "description": "Stores installment information associated with a loan. This collection can be a subcollection of loans for better data organization, e.g., /loans/{loanId}/installments/{installmentId}."
-        }
-      },
-      {
-        "path": "/payments/{paymentId}",
-        "definition": {
-          "entityName": "Payment",
-          "schema": {
-            "$ref": "#/backend/entities/Payment"
-          },
-          "description": "Stores payment information associated with a partner."
-        }
-      },
-      {
-        "path": "/receipts/{receiptId}",
-        "definition": {
-          "entityName": "Receipt",
-          "schema": {
-            "$ref": "#/backend/entities/Receipt"
-          },
-          "description": "Stores receipt information associated with a payment."
-        }
-      },
-      {
-        "path": "/reports/{reportId}",
-        "definition": {
-          "entityName": "Report",
-          "schema": {
-            "$ref": "#/backend/entities/Report"
-          },
-          "description": "Stores financial report data."
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed for public access, as authentication is handled by a simple PIN at the application level. Collections are placed at the root level to simplify security rules, allowing open read/write access. Subcollections might be used for installments under loans for better data integrity. This model is suitable for an internal tool where all users are trusted and no granular user-based permissions are required."
+    "/partners/{partnerId}": {
+        "schema": { "$ref": "#/entities/Partner" },
+        "description": "Stores partner information. Each document represents a partner in the lending system."
+    },
+    "/loans/{loanId}": {
+        "schema": { "$ref": "#/entities/Loan" },
+        "description": "Stores loan information associated with a partner."
+    },
+    "/installments/{installmentId}": {
+        "schema": { "$ref": "#/entities/Installment" },
+        "description": "Stores installment information associated with a loan. This collection can be a subcollection of loans for better data organization, e.g., /loans/{loanId}/installments/{installmentId}."
+    },
+    "/payments/{paymentId}": {
+        "schema": { "$ref": "#/entities/Payment" },
+        "description": "Stores payment information associated with a partner."
+    },
+    "/receipts/{receiptId}": {
+        "schema": { "$ref": "#/entities/Receipt" },
+        "description": "Stores receipt information associated with a payment."
+    },
+    "/reports/{reportId}": {
+        "schema": { "$ref": "#/entities/Report" },
+        "description": "Stores financial report data."
+    }
   }
 }
