@@ -143,7 +143,7 @@ export default function LoansPage() {
       await batch.commit();
 
       toast({
-        title: "Préstamos Eliminados",
+        title: "Todos los Préstamos Eliminados",
         description: `Se han eliminado ${loansToDelete.length} préstamos y sus cuotas asociadas.`,
       });
     } catch (error) {
@@ -172,7 +172,7 @@ export default function LoansPage() {
     reader.onload = async (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
@@ -316,7 +316,7 @@ export default function LoansPage() {
       });
       setIsImporting(false);
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
   
   const isLoading = loansLoading || partnersLoading;
