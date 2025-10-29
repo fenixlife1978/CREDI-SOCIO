@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 
 const months = Array.from({ length: 12 }, (_, i) => ({
@@ -48,122 +47,6 @@ function ReportSkeleton() {
             </CardFooter>
         </Card>
     )
-}
-
-function PaymentsReportTab() {
-  const firestore = useFirestore();
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-
-  const paymentsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'payments')) : null),
-    [firestore]
-  );
-  const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
-
-  const { filteredPayments, totalAmount, totalCapital, totalInterest } = useMemo(() => {
-    if (!payments) return { filteredPayments: [], totalAmount: 0, totalCapital: 0, totalInterest: 0 };
-    
-    const filtered = payments.filter(p => {
-      const paymentDate = parseISO(p.paymentDate);
-      return getMonth(paymentDate) === selectedMonth && getYear(paymentDate) === selectedYear;
-    });
-
-    const totals = filtered.reduce((acc, p) => {
-        acc.totalAmount += p.totalAmount;
-        acc.totalCapital += p.capitalAmount;
-        acc.totalInterest += p.interestAmount;
-        return acc;
-    }, { totalAmount: 0, totalCapital: 0, totalInterest: 0 });
-
-
-    return { 
-        filteredPayments: filtered, 
-        totalAmount: totals.totalAmount, 
-        totalCapital: totals.totalCapital,
-        totalInterest: totals.totalInterest
-    };
-  }, [payments, selectedMonth, selectedYear]);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Reporte de Pagos</CardTitle>
-        <CardDescription>Filtra los pagos por mes y año para ver el total recaudado.</CardDescription>
-        <div className="flex gap-2 pt-4">
-          <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Selecciona un mes" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map(month => (
-                <SelectItem key={month.value} value={String(month.value)}>
-                  <span className="capitalize">{month.label}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Selecciona un año" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(year => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? <ReportSkeleton/> :
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Socio</TableHead>
-              <TableHead>Fecha de Pago</TableHead>
-              <TableHead className="text-right">Capital Pagado</TableHead>
-              <TableHead className="text-right">Interés Pagado</TableHead>
-              <TableHead className="text-right">Monto Total</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPayments.map((payment) => (
-              <TableRow key={payment.id}>
-                <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
-                <TableCell>{format(parseISO(payment.paymentDate), 'dd/MM/yyyy')}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.capitalAmount)}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.interestAmount)}</TableCell>
-                <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
-              </TableRow>
-            ))}
-            {filteredPayments.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  No hay pagos registrados para este período.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>}
-      </CardContent>
-       {!isLoading && filteredPayments.length > 0 && (
-        <CardFooter className="flex-col items-end gap-2">
-            <div className="text-lg font-semibold">
-                Total Capital Recaudado: {currencyFormatter.format(totalCapital)}
-            </div>
-            <div className="text-lg font-semibold">
-                Total Interés Recaudado: {currencyFormatter.format(totalInterest)}
-            </div>
-            <div className="text-xl font-bold">
-                Total General Recaudado: {currencyFormatter.format(totalAmount)}
-            </div>
-        </CardFooter>
-      )}
-    </Card>
-  );
 }
 
 function UnpaidInstallmentsTab() {
@@ -304,18 +187,7 @@ export default function ReportsPage() {
        <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Reportes</h1>
       </div>
-      <Tabs defaultValue="payments">
-        <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="payments">Reporte de Pagos</TabsTrigger>
-            <TabsTrigger value="unpaid">Cuotas No Pagadas</TabsTrigger>
-        </TabsList>
-        <TabsContent value="payments">
-            <PaymentsReportTab />
-        </TabsContent>
-        <TabsContent value="unpaid">
-            <UnpaidInstallmentsTab />
-        </TabsContent>
-      </Tabs>
+      <UnpaidInstallmentsTab />
     </div>
   );
 }
