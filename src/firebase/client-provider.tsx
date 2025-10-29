@@ -2,7 +2,7 @@
 
 import React, { useMemo, type ReactNode, useEffect, useState } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
-import { initializeFirebase } from '@/firebase';
+import { auth, firestore, firebaseApp } from '@/firebase/client';
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 
 interface FirebaseClientProviderProps {
@@ -12,9 +12,6 @@ interface FirebaseClientProviderProps {
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Get memoized SDK instances
-  const { firebaseApp, firestore, auth } = useMemo(() => initializeFirebase(), []);
 
   useEffect(() => {
     if (!auth) {
@@ -36,7 +33,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     });
 
     return () => unsubscribe();
-  }, [auth]);
+  }, []);
 
   // While waiting for auth state, render nothing to prevent child components from running
   if (isLoading) {

@@ -1,3 +1,5 @@
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+
 export const firebaseConfig = {
   "projectId": "studio-5740654397-14205",
   "appId": "1:318145535367:web:031ea843239faee31c0722",
@@ -6,3 +8,14 @@ export const firebaseConfig = {
   "measurementId": "",
   "messagingSenderId": "318145535367"
 };
+
+// Helper function to initialize Firebase
+function initializeFirebaseApp(): FirebaseApp {
+  if (!getApps().length) {
+    return initializeApp(firebaseConfig);
+  } else {
+    return getApp();
+  }
+}
+
+export const firebaseApp = initializeFirebaseApp();
