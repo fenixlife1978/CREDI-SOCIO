@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, writeBatch, getDocs } from 'firebase/firestore';
 import type { Installment, Partner, Loan } from '@/lib/data';
 import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Trash2, Loader } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const months = Array.from({ length: 12 }, (_, i) => ({
   value: i,
@@ -23,9 +25,11 @@ const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 
 
 export default function RegisterPaymentPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedInstallments, setSelectedInstallments] = useState<Record<string, boolean>>({});
+  const [isCleaning, setIsCleaning] = useState(false);
 
   const installmentsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'pending')) : null),
@@ -78,6 +82,57 @@ export default function RegisterPaymentPage() {
     setSelectedInstallments(prev => ({ ...prev, [id]: checked }));
   };
 
+  const handleCleanOrphanInstallments = async () => {
+    if (!firestore) return;
+    setIsCleaning(true);
+
+    try {
+      const allInstallmentsQuery = query(collection(firestore, 'installments'));
+      const allPartnersQuery = query(collection(firestore, 'partners'));
+      
+      const [installmentsSnapshot, partnersSnapshot] = await Promise.all([
+        getDocs(allInstallmentsQuery),
+        getDocs(allPartnersQuery),
+      ]);
+
+      const existingPartnerIds = new Set(partnersSnapshot.docs.map(doc => doc.id));
+      const orphanInstallments = installmentsSnapshot.docs.filter(
+        doc => !existingPartnerIds.has(doc.data().partnerId)
+      );
+
+      if (orphanInstallments.length === 0) {
+        toast({
+          title: "Sin cambios",
+          description: "No se encontraron cuotas huérfanas para limpiar.",
+        });
+        setIsCleaning(false);
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      orphanInstallments.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+
+      toast({
+        title: "¡Limpieza Completa!",
+        description: `Se eliminaron ${orphanInstallments.length} cuotas huérfanas. La lista se actualizará.`,
+      });
+      // The useCollection hook should update the list automatically.
+    } catch (error) {
+      console.error("Error cleaning orphan installments:", error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al limpiar las cuotas. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
@@ -125,9 +180,15 @@ export default function RegisterPaymentPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Cuotas Pendientes para {months.find(m => m.value === selectedMonth)?.label} de {selectedYear}</CardTitle>
-          <CardDescription>Marca las cuotas que han sido pagadas y procesa el pago.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle>Cuotas Pendientes para {months.find(m => m.value === selectedMonth)?.label} de {selectedYear}</CardTitle>
+                <CardDescription>Marca las cuotas que han sido pagadas y procesa el pago.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleCleanOrphanInstallments} disabled={isCleaning}>
+                {isCleaning ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Limpiar Cuotas Huérfanas
+            </Button>
         </CardHeader>
         <CardContent>
           <div className="relative w-full overflow-auto">
