@@ -8,8 +8,8 @@ import { MoreHorizontal, PlusCircle, Upload, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, doc, writeBatch, deleteDoc } from "firebase/firestore";
-import type { Partner } from "@/lib/data";
+import { collection, query, doc, writeBatch, deleteDoc, getDocs, where } from "firebase/firestore";
+import type { Partner, Loan, Installment } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
@@ -116,18 +116,49 @@ export default function PartnersPage() {
 
   const handleDeleteConfirm = async () => {
     if (!partnerToDelete || !firestore) return;
+    
     try {
+      const batch = writeBatch(firestore);
+  
+      // 1. Delete the partner document
       const partnerDocRef = doc(firestore, 'partners', partnerToDelete.id);
-      await deleteDoc(partnerDocRef);
+      batch.delete(partnerDocRef);
+  
+      // 2. Find and delete all loans associated with the partner
+      const loansQuery = query(collection(firestore, 'loans'), where('partnerId', '==', partnerToDelete.id));
+      const loansSnapshot = await getDocs(loansQuery);
+  
+      const loanIds = loansSnapshot.docs.map(doc => doc.id);
+  
+      for (const loanDoc of loansSnapshot.docs) {
+        batch.delete(loanDoc.ref);
+      }
+  
+      // 3. Find and delete all installments associated with those loans
+      if (loanIds.length > 0) {
+        // Firestore 'in' query is limited to 30 items. If there are more loans, we need to batch the installment deletion queries.
+        for (let i = 0; i < loanIds.length; i += 30) {
+          const chunkOfLoanIds = loanIds.slice(i, i + 30);
+          const installmentsQuery = query(collection(firestore, 'installments'), where('loanId', 'in', chunkOfLoanIds));
+          const installmentsSnapshot = await getDocs(installmentsQuery);
+          installmentsSnapshot.forEach(installmentDoc => {
+            batch.delete(installmentDoc.ref);
+          });
+        }
+      }
+  
+      await batch.commit();
+  
       toast({
-        title: "Socio Eliminado",
-        description: `El socio ${partnerToDelete.firstName} ${partnerToDelete.lastName} ha sido eliminado.`,
+        title: "Socio y Datos Eliminados",
+        description: `El socio ${partnerToDelete.firstName} ${partnerToDelete.lastName} y todos sus préstamos y cuotas han sido eliminados.`,
       });
+  
     } catch (error) {
-      console.error("Error deleting partner: ", error);
+      console.error("Error deleting partner and associated data: ", error);
       toast({
         title: "Error al eliminar",
-        description: "No se pudo eliminar el socio. Inténtalo de nuevo.",
+        description: "No se pudo eliminar el socio y sus datos asociados. Inténtalo de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -237,7 +268,7 @@ export default function PartnersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente al socio <span className="font-bold">{partnerToDelete?.firstName} {partnerToDelete?.lastName}</span> de la base de datos.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente al socio <span className="font-bold">{partnerToDelete?.firstName} {partnerToDelete?.lastName}</span> y todos sus préstamos y cuotas asociadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
