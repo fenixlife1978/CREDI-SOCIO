@@ -30,7 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 const partnerSchema = z.object({
   firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres.'),
   lastName: z.string().min(2, 'El apellido debe tener al menos 2 caracteres.'),
-  identificationNumber: z.string().min(5, 'La cédula debe tener al menos 5 caracteres.'),
+  identificationNumber: z.string().optional(),
   alias: z.string().optional(),
 });
 
@@ -68,7 +68,11 @@ export function AddPartnerDialog({ isOpen, setIsOpen }: AddPartnerDialogProps) {
   
     try {
       const partnersCollectionRef = collection(firestore, 'partners');
-      await addDoc(partnersCollectionRef, data);
+      await addDoc(partnersCollectionRef, {
+        ...data,
+        identificationNumber: data.identificationNumber || '',
+        alias: data.alias || '',
+      });
   
       toast({
         title: '¡Socio añadido!',
@@ -133,7 +137,7 @@ export function AddPartnerDialog({ isOpen, setIsOpen }: AddPartnerDialogProps) {
               name="identificationNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cédula</FormLabel>
+                  <FormLabel>Cédula (Opcional)</FormLabel>
                   <FormControl>
                     <Input placeholder="Ej: 123456789" {...field} />
                   </FormControl>
