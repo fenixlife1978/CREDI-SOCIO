@@ -3,7 +3,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { Auth } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
@@ -32,24 +32,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
   firebaseApp,
   firestore,
-  // auth prop is now used as a fallback, but we will initialize auth here
+  auth,
 }) => {
-
-  const auth = useMemo(() => {
-    if (firebaseApp) {
-      const authInstance = getAuth(firebaseApp);
-      onAuthStateChanged(authInstance, (user) => {
-        if (!user) {
-          // signInAnonymously is a client-side only operation and is safe here.
-          signInAnonymously(authInstance).catch((error) => {
-            console.error("Anonymous sign-in failed:", error);
-          });
-        }
-      });
-      return authInstance;
-    }
-    return null;
-  }, [firebaseApp]);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
@@ -77,7 +61,9 @@ export const useFirebase = (): FirebaseServices => {
   }
 
   if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
+    // This can happen transiently while auth is initializing.
+    // Components using this should be prepared for this to throw.
+    throw new Error('Firebase core services not available. Check FirebaseProvider props and authentication status.');
   }
 
   return {
