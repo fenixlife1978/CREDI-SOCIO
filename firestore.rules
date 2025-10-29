@@ -1,109 +1,118 @@
 /**
- * @fileOverview Firestore Security Rules for the Lending System.
+ * @file Firestore Security Rules
+ * @description This ruleset provides open access to all data for authenticated users.
+ *   It is designed for a trusted internal tool where fine-grained permissions are not required.
  *
  * Core Philosophy:
- * This ruleset is designed for prototyping an internal tool with trusted users.
- * It provides open read and write access to all collections, reflecting the
- * provided reasoning that authentication is handled at the application level and all
- * users are trusted.
+ *   The security model assumes all users are trusted. Any authenticated user
+ *   can read and write any data.
  *
  * Data Structure:
- * All collections reside at the root level:
- * - /partners/{partnerId}
- * - /loans/{loanId}
- * - /installments/{installmentId}
- * - /payments/{paymentId}
- * - /receipts/{receiptId}
- * - /reports/{reportId}
+ *   All collections (partners, loans, installments, payments, receipts, reports)
+ *   reside at the root level of the Firestore database.
  *
  * Key Security Decisions:
- * - All users, authenticated or not, have read and write access to all collections.
- * - No user-specific authorization is enforced at the Firestore level.
- *
- * WARNING: These rules are not suitable for production environments where
- * untrusted users may have access.  Implement proper authentication and
- * authorization mechanisms before deploying to production.
+ *   - User listing is implicitly allowed due to the open read access.
+ *   - There are no specific roles or ownership checks.
+ *   - Authentication is required for all operations.
+ *   - Data shape is not validated.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any user to read and write partner data.
+     * @description Grants read and write access to the 'partners' collection for any authenticated user.
      * @path /partners/{partnerId}
-     * @allow (get, list) - Any user can read partner data.
-     * @allow (create, update, delete) - Any user can create, update, or delete partner data.
-     * @deny none
-     * @principle Open read and write access for prototyping.
+     * @allow (get, list) Any authenticated user can read partner data.
+     * @allow (create, update, delete) Any authenticated user can modify partner data.
+     * @deny (create, update, delete) If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write partner data.
      */
     match /partners/{partnerId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows any user to read and write loan data.
+     * @description Grants read and write access to the 'loans' collection for any authenticated user.
      * @path /loans/{loanId}
-     * @allow (get, list) - Any user can read loan data.
-     * @allow (create, update, delete) - Any user can create, update, or delete loan data.
-     * @deny none
-     * @principle Open read and write access for prototyping.
+     * @allow (get, list) Any authenticated user can read loan data.
+     * @allow (create, update, delete) Any authenticated user can modify loan data.
+     * @deny (create, update, delete) If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write loan data.
      */
     match /loans/{loanId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows any user to read and write installment data.
+     * @description Grants read and write access to the 'installments' collection for any authenticated user.
      * @path /installments/{installmentId}
-     * @allow (get, list) - Any user can read installment data.
-     * @allow (create, update, delete) - Any user can create, update, or delete installment data.
-     * @deny none
-     * @principle Open read and write access for prototyping.
+     * @allow (get, list) Any authenticated user can read installment data.
+     * @allow (create, update, delete) Any authenticated user can modify installment data.
+     * @deny (create, update, delete) If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write installment data.
      */
     match /installments/{installmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows any user to read and write payment data.
+     * @description Grants read and write access to the 'payments' collection for any authenticated user.
      * @path /payments/{paymentId}
-     * @allow (get, list) - Any user can read payment data.
-     * @allow (create, update, delete) - Any user can create, update, or delete payment data.
-     * @deny none
-     * @principle Open read and write access for prototyping.
+     * @allow (get, list) Any authenticated user can read payment data.
+     * @allow (create, update, delete) Any authenticated user can modify payment data.
+     * @deny (create, update, delete) If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write payment data.
      */
     match /payments/{paymentId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows any user to read and write receipt data.
+     * @description Grants read and write access to the 'receipts' collection for any authenticated user.
      * @path /receipts/{receiptId}
-     * @allow (get, list) - Any user can read receipt data.
-     * @allow (create, update, delete) - Any user can create, update, or delete receipt data.
-     * @deny none
-     * @principle Open read and write access for prototyping.
+     * @allow (get, list) Any authenticated user can read receipt data.
+     * @allow (create, update, delete) Any authenticated user can modify receipt data.
+     * @deny (create, update, delete) If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write receipt data.
      */
     match /receipts/{receiptId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows any user to read and write report data.
+     * @description Grants read and write access to the 'reports' collection for any authenticated user.
      * @path /reports/{reportId}
-     * @allow (get, list) - Any user can read report data.
-     * @allow (create, update, delete) - Any user can create, update, or delete report data.
-     * @deny none
-     * @principle Open read and write access for prototyping.
+     * @allow (get, list) Any authenticated user can read report data.
+     * @allow (create, update, delete) Any authenticated user can modify report data.
+     * @deny (create, update, delete) If the user is not authenticated.
+     * @principle Allows any authenticated user to read and write report data.
      */
     match /reports/{reportId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
     }
   }
 }
