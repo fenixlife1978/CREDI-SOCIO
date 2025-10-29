@@ -248,9 +248,9 @@ export default function LoansPage() {
               const capitalPerInstallment = loanData.totalAmount / termDuration;
               let interestPerInstallment = 0;
 
-              if (loanData.loanType === 'standard') {
-                interestPerInstallment = loanData.totalAmount * (loanData.interestRate / 100);
-              } else { // custom
+              if (loanData.loanType === 'standard' && loanData.interestRate) {
+                interestPerInstallment = capitalPerInstallment * (loanData.interestRate / 100);
+              } else if (loanData.loanType === 'custom') {
                 interestPerInstallment = loanData.fixedInterestAmount || 0;
               }
 

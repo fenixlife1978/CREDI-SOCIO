@@ -140,11 +140,8 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
             partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
             numberOfInstallments: data.numberOfInstallments ?? 0,
             interestRate: data.interestRate ?? 0,
+            fixedInterestAmount: data.fixedInterestAmount,
         };
-
-        if (data.loanType === 'custom') {
-            loanData.fixedInterestAmount = data.fixedInterestAmount;
-        }
 
         await updateDoc(loanDocRef, loanData);
         toast({
@@ -182,9 +179,9 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
           const capitalPerInstallment = data.totalAmount / termDuration;
           let interestPerInstallment = 0;
 
-          if(data.loanType === 'standard'){
-              interestPerInstallment = data.totalAmount * ((data.interestRate || 0) / 100);
-          } else { // custom
+          if(data.loanType === 'standard' && data.interestRate){
+              interestPerInstallment = capitalPerInstallment * (data.interestRate / 100);
+          } else if (data.loanType === 'custom') {
               interestPerInstallment = data.fixedInterestAmount || 0;
           }
 
