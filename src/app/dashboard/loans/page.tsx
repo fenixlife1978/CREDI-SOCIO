@@ -246,30 +246,34 @@ export default function LoansPage() {
             const termDuration = loanData.numberOfInstallments;
             if (termDuration > 0) {
               const capitalPerInstallment = loanData.totalAmount / termDuration;
-              let interestPerInstallment = 0;
-
-              if (loanData.loanType === 'standard' && loanData.interestRate) {
-                interestPerInstallment = capitalPerInstallment * (loanData.interestRate / 100);
-              } else if (loanData.loanType === 'custom') {
-                interestPerInstallment = loanData.fixedInterestAmount || 0;
-              }
-
-              const totalPerInstallment = capitalPerInstallment + interestPerInstallment;
+              let remainingBalance = loanData.totalAmount;
               
               for (let i = 1; i <= termDuration; i++) {
-                const installmentDocRef = doc(installmentsRef);
-                const dueDate = addMonths(startDate, i);
-                
-                batch.set(installmentDocRef, {
-                  loanId: newLoanDocRef.id,
-                  partnerId: partner.id,
-                  installmentNumber: i,
-                  dueDate: dueDate.toISOString(),
-                  status: 'pending',
-                  capitalAmount: capitalPerInstallment,
-                  interestAmount: interestPerInstallment,
-                  totalAmount: totalPerInstallment,
-                });
+                  let interestForInstallment = 0;
+                  if (loanData.loanType === 'standard' && loanData.interestRate) {
+                      // Calculate interest on the remaining balance
+                      interestForInstallment = remainingBalance * (loanData.interestRate / 100);
+                  } else if (loanData.loanType === 'custom') {
+                      interestForInstallment = loanData.fixedInterestAmount || 0;
+                  }
+
+                  const installmentTotal = capitalPerInstallment + interestForInstallment;
+                  const installmentDocRef = doc(installmentsRef);
+                  const dueDate = addMonths(startDate, i);
+
+                  batch.set(installmentDocRef, {
+                      loanId: newLoanDocRef.id,
+                      partnerId: partner.id,
+                      installmentNumber: i,
+                      dueDate: dueDate.toISOString(),
+                      status: 'pending',
+                      capitalAmount: capitalPerInstallment,
+                      interestAmount: interestForInstallment,
+                      totalAmount: installmentTotal,
+                  });
+
+                  // Update remaining balance for the next iteration
+                  remainingBalance -= capitalPerInstallment;
               }
             }
             importedCount++;

@@ -102,7 +102,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
         interestRate: loanToEdit.interestRate,
         numberOfInstallments: loanToEdit.numberOfInstallments,
         startDate: format(parseISO(loanToEdit.startDate), 'yyyy-MM-dd'),
-        fixedInterestAmount: loanToEdit.fixedInterestAmount ?? 0,
+        fixedInterestAmount: loanToEdit.fixedInterestAmount,
         hasTerm: loanToEdit.numberOfInstallments > 0 ? 'yes' : 'no',
       });
     } else {
@@ -177,31 +177,34 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
 
         if (termDuration && termDuration > 0) {
           const capitalPerInstallment = data.totalAmount / termDuration;
-          let interestPerInstallment = 0;
-
-          if(data.loanType === 'standard' && data.interestRate){
-              interestPerInstallment = capitalPerInstallment * (data.interestRate / 100);
-          } else if (data.loanType === 'custom') {
-              interestPerInstallment = data.fixedInterestAmount || 0;
-          }
-
-          const totalPerInstallment = capitalPerInstallment + interestPerInstallment;
-          const startDate = new Date(data.startDate);
-
+          let remainingBalance = data.totalAmount;
+          
           for (let i = 1; i <= termDuration; i++) {
-            const installmentDocRef = doc(installmentsRef);
-            const dueDate = addMonths(startDate, i);
-            
-            batch.set(installmentDocRef, {
-              loanId: loanDocRef.id,
-              partnerId: data.partnerId,
-              installmentNumber: i,
-              dueDate: dueDate.toISOString(),
-              status: 'pending',
-              capitalAmount: capitalPerInstallment,
-              interestAmount: interestPerInstallment,
-              totalAmount: totalPerInstallment,
-            });
+              let interestForInstallment = 0;
+              if (data.loanType === 'standard' && data.interestRate) {
+                  // Calculate interest on the remaining balance
+                  interestForInstallment = remainingBalance * (data.interestRate / 100);
+              } else if (data.loanType === 'custom') {
+                  interestForInstallment = data.fixedInterestAmount || 0;
+              }
+
+              const installmentTotal = capitalPerInstallment + interestForInstallment;
+              const installmentDocRef = doc(installmentsRef);
+              const dueDate = addMonths(new Date(data.startDate), i);
+
+              batch.set(installmentDocRef, {
+                  loanId: loanDocRef.id,
+                  partnerId: data.partnerId,
+                  installmentNumber: i,
+                  dueDate: dueDate.toISOString(),
+                  status: 'pending',
+                  capitalAmount: capitalPerInstallment,
+                  interestAmount: interestForInstallment,
+                  totalAmount: installmentTotal,
+              });
+
+              // Update remaining balance for the next iteration
+              remainingBalance -= capitalPerInstallment;
           }
         }
         await batch.commit();
@@ -366,7 +369,7 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
                   name="interestRate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tasa de Interés (%)</FormLabel>
+                      <FormLabel>Tasa de Interés (%) Mensual</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
                       </FormControl>
