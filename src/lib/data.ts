@@ -24,7 +24,7 @@ export type Loan = {
   
   // Optional: For displaying partner info directly on the loan
   partnerName?: string; 
-  fixedInterestAmount?: number;
+  fixedInterestAmount?: number | null;
 };
 
 export type Payment = {
@@ -51,21 +51,3 @@ export type Installment = {
   interestAmount: number;
   totalAmount: number;
 }
-
-
-// Sample data for the anomaly detector feature.
-// This is NOT used in the main application logic anymore.
-export const sampleLoanForAnomalyDetection = {
-  loanId: "L-ANOM-01",
-  totalAmount: 1000,
-  installmentsCount: 5,
-  installments: [
-    { number: 1, dueDate: "2024-01-15", amount: 200, status: "paid", paymentDate: "2024-01-14" },
-    { number: 2, dueDate: "2024-02-15", amount: 200, status: "paid", paymentDate: "2024-03-20" }, // Paid late
-    { number: 3, dueDate: "2024-03-15", amount: 200, status: "paid", paymentDate: "2024-02-18" }, // Paid before installment 2
-    { number: 4, dueDate: "2024-04-15", amount: 250, status: "paid", paymentDate: "2024-04-15" }, // Incoherent amount (higher than others)
-    { number: 5, dueDate: "2024-05-15", amount: 200, status: "pending", paymentDate: null }
-  ]
-};
-
-export const sampleLoanJsonString = JSON.stringify(sampleLoanForAnomalyDetection, null, 2);

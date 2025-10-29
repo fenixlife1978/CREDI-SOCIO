@@ -43,8 +43,7 @@
       "required": [
         "id",
         "firstName",
-        "lastName",
-        "identificationNumber"
+        "lastName"
       ]
     },
     "Loan": {
@@ -280,42 +279,6 @@
         "capitalRecovered",
         "interestEarned"
       ]
-    },
-    "Anomaly": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Anomaly",
-      "type": "object",
-      "description": "Represents an anomaly detected in the data.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Anomaly entity."
-        },
-        "entityType": {
-          "type": "string",
-          "description": "The type of entity where the anomaly was detected (e.g., Installment, Payment)."
-        },
-        "entityId": {
-          "type": "string",
-          "description": "The ID of the entity where the anomaly was detected."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the anomaly."
-        },
-        "detectionDate": {
-          "type": "string",
-          "description": "The date when the anomaly was detected.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "entityType",
-        "entityId",
-        "description",
-        "detectionDate"
-      ]
     }
   },
   "auth": {
@@ -383,16 +346,6 @@
             "$ref": "#/backend/entities/Report"
           },
           "description": "Stores financial report data."
-        }
-      },
-      {
-        "path": "/anomalies/{anomalyId}",
-        "definition": {
-          "entityName": "Anomaly",
-          "schema": {
-            "$ref": "#/backend/entities/Anomaly"
-          },
-          "description": "Stores anomaly detection data."
         }
       }
     ],
