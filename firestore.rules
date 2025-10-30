@@ -1,122 +1,157 @@
 /**
- * @fileoverview Firestore Security Rules for the lending system prototype.
+ * @fileoverview Firestore Security Rules for the lending system application.
  *
  * Core Philosophy:
- * This ruleset prioritizes secure data access based on user authentication.
- * It broadly allows public read access to most collections for demonstration purposes,
- * while restricting write access to authenticated users.
+ * This ruleset prioritizes secure data access based on user authentication and
+ * explicit authorization. It enforces data ownership where applicable and
+ * provides controlled access to shared resources.
  *
  * Data Structure:
- * The Firestore database consists of top-level collections for partners, loans,
- * installments, payments, receipts, and reports.
+ * - /partners/{partnerId}: Stores partner information.
+ * - /loans/{loanId}: Stores loan information.
+ * - /installments/{installmentId}: Stores installment information.
+ * - /payments/{paymentId}: Stores payment information.
+ * - /receipts/{receiptId}: Stores receipt information.
+ * - /reports/{reportId}: Stores generated financial reports.
+ * - /settings/companyProfile: Stores the company profile information (single document).
  *
  * Key Security Decisions:
- * - Public read access is enabled for all collections to facilitate demonstration.
- * - All write operations require user authentication (isSignedIn()).
- * - No specific roles or ownership models are enforced beyond authentication.
+ * - Partners, Loans, Installments, Payments, Receipts and Reports can only be created, read, updated or deleted by authenticated users.
+ * - The company profile information is accessible to any authenticated user.
  *
  * Denormalization for Authorization:
- *  Not applicable at this time, as authentication is the sole authorization factor.
+ *  - The security rules rely on authentication to grant access to the data. No data denormalization is required.
  *
  * Structural Segregation:
- *  Not applicable at this time.
+ * - All data is stored in top-level collections. There is no need to segregate private and public data.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows anyone to read partner information, but only authenticated users can create, update, or delete partner data.
+     * @description Grants access to company profile information for authenticated users.
+     * @path /settings/companyProfile
+     * @allow (get) Authenticated user can read the company profile.
+     * @deny (create, update, delete) No one can create, update, or delete the company profile.
+     * @principle Grants read access to authenticated users, but restricts write access.
+     */
+    match /settings/companyProfile {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Manages access to partner information.
      * @path /partners/{partnerId}
-     * @allow (get, list): Public read access.
-     * @allow (create, update, delete): Only authenticated users can write.
-     * @deny  (create, update, delete): Unauthenticated users cannot write.
-     * @principle Allows public read access while restricting write access to authenticated users.
+     * @allow (create) Authenticated user can create a partner.
+     * @allow (get, list) Authenticated user can read partner information.
+     * @allow (update, delete) Authenticated user can update or delete a partner.
+     * @deny (create, update, delete) Requests without authentication are denied.
+     * @principle Enforces access control based on authentication for all operations.
      */
     match /partners/{partnerId} {
-      allow get, list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read loan information, but only authenticated users can create, update, or delete loan data.
+     * @description Manages access to loan information.
      * @path /loans/{loanId}
-     * @allow (get, list): Public read access.
-     * @allow (create, update, delete): Only authenticated users can write.
-     * @deny  (create, update, delete): Unauthenticated users cannot write.
-     * @principle Allows public read access while restricting write access to authenticated users.
+     * @allow (create) Authenticated user can create a loan.
+     * @allow (get, list) Authenticated user can read loan information.
+     * @allow (update, delete) Authenticated user can update or delete a loan.
+     * @deny (create, update, delete) Requests without authentication are denied.
+     * @principle Enforces access control based on authentication for all operations.
      */
     match /loans/{loanId} {
-      allow get, list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read installment information, but only authenticated users can create, update, or delete installment data.
+     * @description Manages access to installment information.
      * @path /installments/{installmentId}
-     * @allow (get, list): Public read access.
-     * @allow (create, update, delete): Only authenticated users can write.
-     * @deny  (create, update, delete): Unauthenticated users cannot write.
-     * @principle Allows public read access while restricting write access to authenticated users.
+     * @allow (create) Authenticated user can create an installment.
+     * @allow (get, list) Authenticated user can read installment information.
+     * @allow (update, delete) Authenticated user can update or delete an installment.
+     * @deny (create, update, delete) Requests without authentication are denied.
+     * @principle Enforces access control based on authentication for all operations.
      */
     match /installments/{installmentId} {
-      allow get, list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read payment information, but only authenticated users can create, update, or delete payment data.
+     * @description Manages access to payment information.
      * @path /payments/{paymentId}
-     * @allow (get, list): Public read access.
-     * @allow (create, update, delete): Only authenticated users can write.
-     * @deny  (create, update, delete): Unauthenticated users cannot write.
-     * @principle Allows public read access while restricting write access to authenticated users.
+     * @allow (create) Authenticated user can create a payment.
+     * @allow (get, list) Authenticated user can read payment information.
+     * @allow (update, delete) Authenticated user can update or delete a payment.
+     * @deny (create, update, delete) Requests without authentication are denied.
+     * @principle Enforces access control based on authentication for all operations.
      */
     match /payments/{paymentId} {
-      allow get, list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read receipt information, but only authenticated users can create, update, or delete receipt data.
+     * @description Manages access to receipt information.
      * @path /receipts/{receiptId}
-     * @allow (get, list): Public read access.
-     * @allow (create, update, delete): Only authenticated users can write.
-     * @deny  (create, update, delete): Unauthenticated users cannot write.
-     * @principle Allows public read access while restricting write access to authenticated users.
+     * @allow (create) Authenticated user can create a receipt.
+     * @allow (get, list) Authenticated user can read receipt information.
+     * @allow (update, delete) Authenticated user can update or delete a receipt.
+     * @deny (create, update, delete) Requests without authentication are denied.
+     * @principle Enforces access control based on authentication for all operations.
      */
     match /receipts/{receiptId} {
-      allow get, list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read report information, but only authenticated users can create, update, or delete report data.
+     * @description Manages access to report information.
      * @path /reports/{reportId}
-     * @allow (get, list): Public read access.
-     * @allow (create, update, delete): Only authenticated users can write.
-     * @deny  (create, update, delete): Unauthenticated users cannot write.
-     * @principle Allows public read access while restricting write access to authenticated users.
+     * @allow (create) Authenticated user can create a report.
+     * @allow (get, list) Authenticated user can read report information.
+     * @allow (update, delete) Authenticated user can update or delete a report.
+     * @deny (create, update, delete) Requests without authentication are denied.
+     * @principle Enforces access control based on authentication for all operations.
      */
     match /reports/{reportId} {
-      allow get, list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
+  }
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
+  /**
+   * @description Checks if the user is signed in.
+   * @return {boolean} True if the user is signed in, false otherwise.
+   */
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
