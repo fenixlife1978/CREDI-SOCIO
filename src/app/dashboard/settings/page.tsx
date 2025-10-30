@@ -5,9 +5,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useDoc, useFirestore } from '@/firebase';
+import { useDoc, useFirestore, useStorage } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,7 @@ type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export default function SettingsPage() {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -74,7 +75,6 @@ export default function SettingsPage() {
 
     setIsUploading(true);
     try {
-      const storage = getStorage();
       const logoRef = storageRef(storage, `logos/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(logoRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
@@ -245,4 +245,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
