@@ -188,7 +188,11 @@ export default function InstallmentPayment() {
       // 2. Update status of each paid installment
       for (const inst of installmentsToPay) {
         const installmentRef = doc(firestore, 'installments', inst.id);
-        batch.update(installmentRef, { status: 'paid', paymentDate: new Date(data.paymentDate).toISOString() });
+        batch.update(installmentRef, { 
+            status: 'paid', 
+            paymentDate: new Date(data.paymentDate).toISOString(),
+            paymentId: paymentRef.id // Add payment ID to installment
+        });
       }
 
       // 3. Check if the entire loan is now paid off

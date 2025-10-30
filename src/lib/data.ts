@@ -53,4 +53,5 @@ export type Installment = {
   capitalAmount: number;
   interestAmount: number;
   totalAmount: number;
+  paymentId?: string; // Reference to the payment document
 }

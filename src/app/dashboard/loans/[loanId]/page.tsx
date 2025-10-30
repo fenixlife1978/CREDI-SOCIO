@@ -10,9 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Copy } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 function LoanDetailsSkeleton() {
     return (
@@ -62,6 +63,7 @@ function LoanDetailsSkeleton() {
 export default function LoanDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const firestore = useFirestore();
   const loanId = params.loanId as string;
 
@@ -96,6 +98,14 @@ export default function LoanDetailPage() {
     } catch (error) {
       return "Fecha inválida";
     }
+  };
+  
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado",
+      description: "El ID del pago ha sido copiado al portapapeles.",
+    });
   };
 
   const isLoading = loanLoading || installmentsLoading;
@@ -173,6 +183,7 @@ export default function LoanDetailPage() {
                                 <TableHead className="w-[80px]">Cuota #</TableHead>
                                 <TableHead>Fecha de Vencimiento</TableHead>
                                 <TableHead>Estado</TableHead>
+                                <TableHead>ID de Pago</TableHead>
                                 <TableHead className="text-right">Capital</TableHead>
                                 <TableHead className="text-right">Interés</TableHead>
                                 <TableHead className="text-right">Monto Total</TableHead>
@@ -188,6 +199,20 @@ export default function LoanDetailPage() {
                                             {installment.status}
                                         </Badge>
                                     </TableCell>
+                                     <TableCell>
+                                        {installment.paymentId ? (
+                                             <div className="flex items-center gap-2">
+                                                <span className="font-mono text-xs text-muted-foreground">
+                                                    ...{installment.paymentId.slice(-5)}
+                                                </span>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyToClipboard(installment.paymentId!)}>
+                                                    <Copy className="h-3 w-3" />
+                                                </Button>
+                                             </div>
+                                        ) : (
+                                            '-'
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
                                     <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
                                     <TableCell className="text-right font-semibold">{currencyFormatter.format(installment.totalAmount)}</TableCell>
@@ -195,7 +220,7 @@ export default function LoanDetailPage() {
                             ))}
                             {sortedInstallments.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell colSpan={7} className="h-24 text-center">
                                         Este préstamo no tiene un plan de cuotas definido.
                                     </TableCell>
                                 </TableRow>

@@ -246,48 +246,58 @@ export default function RegisterPaymentPage() {
       const batch = writeBatch(firestore);
       const installmentsToUpdate = installments.filter(inst => installmentIdsToProcess.includes(inst.id));
 
+      const paymentsByLoan: Record<string, any> = {};
       const loanStatusCheck: Record<string, boolean> = {};
 
       for (const inst of installmentsToUpdate) {
-        // Calculate payment date based on user's logic
         const originalDueDate = parseISO(inst.dueDate);
         const paymentDate = set(originalDueDate, {
             month: selectedMonth,
             year: selectedYear
         }).toISOString();
-        
-        // 1. Mark installment as paid
-        const installmentRef = doc(firestore, 'installments', inst.id);
-        batch.update(installmentRef, { status: 'paid', paymentDate });
 
-        // 2. Create payment record
-        const paymentRef = doc(collection(firestore, 'payments'));
-        const partnerName = partnersMap.get(inst.partnerId) || inst.partnerId;
-        batch.set(paymentRef, {
-            partnerId: inst.partnerId,
-            loanId: inst.loanId,
-            installmentIds: [inst.id], // One payment record per installment for simplicity
-            paymentDate,
-            totalAmount: inst.totalAmount,
-            capitalAmount: inst.capitalAmount,
-            interestAmount: inst.interestAmount,
-            partnerName,
+        if (!paymentsByLoan[inst.loanId]) {
+            const paymentRef = doc(collection(firestore, 'payments'));
+            paymentsByLoan[inst.loanId] = {
+                ref: paymentRef,
+                partnerId: inst.partnerId,
+                loanId: inst.loanId,
+                installmentIds: [],
+                totalAmount: 0,
+                capitalAmount: 0,
+                interestAmount: 0,
+                paymentDate,
+                partnerName: partnersMap.get(inst.partnerId) || inst.partnerId,
+            };
+        }
+
+        paymentsByLoan[inst.loanId].installmentIds.push(inst.id);
+        paymentsByLoan[inst.loanId].totalAmount += inst.totalAmount;
+        paymentsByLoan[inst.loanId].capitalAmount += inst.capitalAmount;
+        paymentsByLoan[inst.loanId].interestAmount += inst.interestAmount;
+
+        const installmentRef = doc(firestore, 'installments', inst.id);
+        batch.update(installmentRef, { 
+            status: 'paid', 
+            paymentDate, 
+            paymentId: paymentsByLoan[inst.loanId].ref.id 
         });
 
-        // Mark loan for status check
         loanStatusCheck[inst.loanId] = true;
       }
+      
+      for(const loanId in paymentsByLoan) {
+          const { ref, ...paymentData } = paymentsByLoan[loanId];
+          batch.set(ref, paymentData);
+      }
 
-      // 3. Check if any loans are now fully paid off
       for (const loanId of Object.keys(loanStatusCheck)) {
           const allInstallmentsForLoanQuery = query(collection(firestore, 'installments'), where('loanId', '==', loanId));
           const allInstallmentsForLoanSnapshot = await getDocs(allInstallmentsForLoanQuery);
 
           const allPaid = allInstallmentsForLoanSnapshot.docs.every(docSnap => {
               const installmentId = docSnap.id;
-              // Is it part of the current batch being paid?
               if (installmentIdsToProcess.includes(installmentId)) return true;
-              // Or was it already paid before?
               return docSnap.data().status === 'paid';
           });
           
