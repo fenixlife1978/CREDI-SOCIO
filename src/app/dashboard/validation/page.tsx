@@ -2,21 +2,27 @@
 
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where, doc } from 'firebase/firestore';
+import { collection, query, writeBatch, getDocs, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck, Wrench, FileText } from 'lucide-react';
+import { Loader, ShieldCheck, Wrench, FileText, Edit } from 'lucide-react';
 import type { Installment, Payment } from '@/lib/data';
 import { isBefore, startOfToday, parse } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function ValidationPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isProcessingOverdue, setIsProcessingOverdue] = useState(false);
   const [isFixingPayments, setIsFixingPayments] = useState(false);
+  const [isUpdatingPaymentDate, setIsUpdatingPaymentDate] = useState(false);
   const [fixLogs, setFixLogs] = useState<string[]>([]);
+  const [paymentIdToUpdate, setPaymentIdToUpdate] = useState('');
+  const [installmentIdToUpdate, setInstallmentIdToUpdate] = useState('');
+  const [newPaymentDate, setNewPaymentDate] = useState('');
 
   const pendingInstallmentsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'pending')) : null),
@@ -184,12 +190,94 @@ export default function ValidationPage() {
     }
   };
 
+  const handleUpdatePaymentDate = async () => {
+    if (!firestore || !paymentIdToUpdate || !installmentIdToUpdate || !newPaymentDate) {
+      toast({
+        title: 'Faltan datos',
+        description: 'Por favor, proporciona el ID del pago, el ID de la cuota y la nueva fecha.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUpdatingPaymentDate(true);
+    
+    try {
+        const newDate = new Date(newPaymentDate);
+        if (isNaN(newDate.getTime())) {
+            throw new Error('La fecha proporcionada no es válida.');
+        }
+        const newDateISO = newDate.toISOString();
+
+        const paymentRef = doc(firestore, 'payments', paymentIdToUpdate);
+        const installmentRef = doc(firestore, 'installments', installmentIdToUpdate);
+
+        const batch = writeBatch(firestore);
+        
+        batch.update(paymentRef, { paymentDate: newDateISO });
+        batch.update(installmentRef, { paymentDate: newDateISO });
+        
+        await batch.commit();
+
+        toast({
+            title: '¡Fecha Actualizada!',
+            description: `Se actualizó la fecha del pago y la cuota a ${newPaymentDate}.`,
+        });
+
+        setPaymentIdToUpdate('');
+        setInstallmentIdToUpdate('');
+        setNewPaymentDate('');
+
+    } catch (error: any) {
+         console.error('Error updating payment date:', error);
+        toast({
+            title: 'Error al Actualizar',
+            description: error.message || 'Ocurrió un error. Verifica los IDs y la fecha.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsUpdatingPaymentDate(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Validación de Datos</h1>
       </div>
+      
+       <Card>
+        <CardHeader>
+          <CardTitle>Corregir Fecha de Pago</CardTitle>
+          <CardDescription>
+            Si registraste un pago con una fecha incorrecta, puedes corregirlo aquí. Necesitarás los IDs del documento de "pago" y de la "cuota" desde Firebase.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-4">
+            <div className="grid w-full max-w-sm items-center gap-1.5">
+                <Label htmlFor="paymentId">ID del Pago</Label>
+                <Input id="paymentId" type="text" placeholder="ID del documento en la colección 'payments'" value={paymentIdToUpdate} onChange={(e) => setPaymentIdToUpdate(e.target.value)} />
+            </div>
+             <div className="grid w-full max-w-sm items-center gap-1.5">
+                <Label htmlFor="installmentId">ID de la Cuota</Label>
+                <Input id="installmentId" type="text" placeholder="ID del documento en la colección 'installments'" value={installmentIdToUpdate} onChange={(e) => setInstallmentIdToUpdate(e.target.value)} />
+            </div>
+             <div className="grid w-full max-w-xs items-center gap-1.5">
+                <Label htmlFor="newDate">Nueva Fecha de Pago</Label>
+                <Input id="newDate" type="date" value={newPaymentDate} onChange={(e) => setNewPaymentDate(e.target.value)} />
+            </div>
+          <Button onClick={handleUpdatePaymentDate} disabled={isUpdatingPaymentDate}>
+            {isUpdatingPaymentDate ? (
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Edit className="mr-2 h-4 w-4" />
+            )}
+            {isUpdatingPaymentDate ? 'Corrigiendo...' : 'Corregir Fecha'}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Marcar Cuotas Atrasadas</CardTitle>
@@ -242,7 +330,6 @@ export default function ValidationPage() {
           )}
         </CardContent>
       </Card>
-
     </div>
   );
 }
