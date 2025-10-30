@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Trash2, Upload, Pencil, ShieldAlert } from "lucide-react";
+import { MoreHorizontal, Trash2, Upload, Pencil, ShieldAlert, Check, ChevronsUpDown, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
@@ -18,6 +18,9 @@ import * as XLSX from 'xlsx';
 import { format, parseISO, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRouter } from "next/navigation";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 export default function LoansPage() {
   const firestore = useFirestore();
@@ -30,7 +33,9 @@ export default function LoansPage() {
   const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
   const loansQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'loans'));
@@ -44,10 +49,14 @@ export default function LoansPage() {
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: partners, isLoading: partnersLoading } = useCollection<Partner>(partnersQuery);
 
-  const sortedLoans = useMemo(() => {
+  const filteredLoans = useMemo(() => {
     if (!loans) return [];
-    return [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  }, [loans]);
+    const sorted = [...loans].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    if (selectedPartnerId) {
+      return sorted.filter(loan => loan.partnerId === selectedPartnerId);
+    }
+    return sorted;
+  }, [loans, selectedPartnerId]);
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
@@ -362,8 +371,62 @@ export default function LoansPage() {
           <CardHeader>
             <CardTitle>Gestionar Préstamos</CardTitle>
             <CardDescription>
-              Visualiza, edita y gestiona todos los préstamos.
+              Busca un socio para ver sus préstamos o visualiza todos los préstamos a continuación.
             </CardDescription>
+            <div className="flex items-center gap-2 pt-4">
+              <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full max-w-sm justify-between"
+                  >
+                    {selectedPartnerId
+                      ? partners?.find(p => p.id === selectedPartnerId)?.firstName + ' ' + partners?.find(p => p.id === selectedPartnerId)?.lastName
+                      : 'Selecciona un socio para filtrar...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar socio..." />
+                    <CommandList>
+                      {partnersLoading && <CommandItem>Cargando...</CommandItem>}
+                      <CommandEmpty>No se encontraron socios.</CommandEmpty>
+                      <CommandGroup>
+                        {partners?.map(partner => (
+                          <CommandItem
+                            value={`${partner.firstName} ${partner.lastName} ${partner.alias || ''} ${partner.identificationNumber || ''}`}
+                            key={partner.id}
+                            onSelect={() => {
+                              setSelectedPartnerId(partner.id);
+                              setPopoverOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                partner.id === selectedPartnerId ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                            <div>
+                              <p>{`${partner.firstName} ${partner.lastName}`}</p>
+                              <p className='text-xs text-muted-foreground'>{partner.identificationNumber}</p>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {selectedPartnerId && (
+                <Button variant="ghost" size="icon" onClick={() => setSelectedPartnerId(null)}>
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Limpiar filtro</span>
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="relative w-full overflow-auto">
@@ -395,7 +458,7 @@ export default function LoansPage() {
                       </TableRow>
                     ))
                   )}
-                  {!isLoading && sortedLoans.map((loan) => (
+                  {!isLoading && filteredLoans.map((loan) => (
                     <TableRow key={loan.id}>
                       <TableCell className="font-medium">{loan.partnerName || loan.partnerId}</TableCell>
                       <TableCell>{currencyFormatter.format(loan.totalAmount)}</TableCell>
@@ -434,10 +497,10 @@ export default function LoansPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {!isLoading && sortedLoans.length === 0 && (
+                  {!isLoading && filteredLoans.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="h-24 text-center">
-                        No se encontraron préstamos.
+                        {selectedPartnerId ? 'Este socio no tiene préstamos registrados.' : 'No se encontraron préstamos.'}
                       </TableCell>
                     </TableRow>
                   )}
