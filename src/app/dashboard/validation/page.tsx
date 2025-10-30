@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader, ShieldCheck, Wrench, FileText } from 'lucide-react';
 import type { Installment, Payment } from '@/lib/data';
-import { isBefore, startOfToday } from 'date-fns';
+import { isBefore, startOfToday, parse } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function ValidationPage() {
@@ -38,8 +38,12 @@ export default function ValidationPage() {
 
     const today = startOfToday();
     const installmentsToUpdate = pendingInstallments.filter(inst => {
-      const dueDate = new Date(inst.dueDate);
-      return isBefore(dueDate, today);
+      try {
+        const dueDate = new Date(inst.dueDate);
+        return isBefore(dueDate, today);
+      } catch (e) {
+        return false;
+      }
     });
 
     if (installmentsToUpdate.length === 0) {
@@ -92,38 +96,70 @@ export default function ValidationPage() {
         const querySnapshot = await getDocs(paymentsQuery);
         const batch = writeBatch(firestore);
 
-        querySnapshot.forEach(document => {
+        for (const document of querySnapshot.docs) {
             const payment = document.data() as Payment;
             const paymentId = document.id;
 
-            const { totalAmount, capitalAmount, interestAmount } = payment;
+            const { totalAmount, capitalAmount, interestAmount, paymentDate } = payment;
 
-            const needsCorrection = !capitalAmount || !interestAmount || isNaN(capitalAmount) || isNaN(interestAmount);
+            let needsCorrection = !capitalAmount || !interestAmount || isNaN(capitalAmount) || isNaN(interestAmount);
+            let newPaymentDateISO: string | null = null;
             
-            if (needsCorrection) {
+            // Date correction logic
+            if (typeof paymentDate === 'string' && !paymentDate.includes('T')) {
+                // Assuming format DD/MM/YYYY if it's not ISO
+                 try {
+                    const parsedDate = parse(paymentDate, 'dd/MM/yyyy', new Date());
+                    if (!isNaN(parsedDate.getTime())) {
+                        newPaymentDateISO = parsedDate.toISOString();
+                        needsCorrection = true; // Mark for correction to update the date format
+                        logs.push(`ID: ${paymentId} | Fecha convertida: ${paymentDate} -> ${newPaymentDateISO}`);
+                    } else {
+                         logs.push(`ID: ${paymentId} | OMITIDO: Formato de fecha '${paymentDate}' no reconocido.`);
+                         continue; // Skip this document if date is invalid
+                    }
+                } catch(e) {
+                     logs.push(`ID: ${paymentId} | OMITIDO: Error al parsear fecha '${paymentDate}'.`);
+                     continue;
+                }
+            }
+
+
+            const breakdownMissing = !capitalAmount || !interestAmount || isNaN(capitalAmount) || isNaN(interestAmount);
+
+            if (breakdownMissing) {
                 if (totalAmount && !isNaN(totalAmount)) {
                     const newInterest = parseFloat((totalAmount * 0.046).toFixed(2));
                     const newCapital = parseFloat((totalAmount - newInterest).toFixed(2));
                     
-                    const paymentRef = doc(firestore, 'payments', paymentId);
-                    batch.update(paymentRef, {
+                    const updateData: any = {
                         capitalAmount: newCapital,
                         interestAmount: newInterest
-                    });
+                    };
+                    if (newPaymentDateISO) {
+                        updateData.paymentDate = newPaymentDateISO;
+                    }
+
+                    const paymentRef = doc(firestore, 'payments', paymentId);
+                    batch.update(paymentRef, updateData);
                     
-                    logs.push(`ID: ${paymentId} | Antes: (C: ${capitalAmount}, I: ${interestAmount}) -> Después: (C: ${newCapital}, I: ${newInterest})`);
+                    logs.push(`ID: ${paymentId} | Desglose Antes: (C: ${capitalAmount}, I: ${interestAmount}) -> Después: (C: ${newCapital}, I: ${newInterest})`);
                     correctedCount++;
                 } else {
-                     logs.push(`ID: ${paymentId} | OMITIDO: montoTotalPagado no es válido.`);
+                     logs.push(`ID: ${paymentId} | OMITIDO (desglose): montoTotalPagado no es válido.`);
                 }
+            } else if (newPaymentDateISO) { // Only date format needs correction
+                 const paymentRef = doc(firestore, 'payments', paymentId);
+                 batch.update(paymentRef, { paymentDate: newPaymentDateISO });
+                 correctedCount++;
             }
-        });
+        }
 
         if (correctedCount > 0) {
             await batch.commit();
             toast({
                 title: 'Corrección Completada',
-                description: `Se corrigieron ${correctedCount} documentos de pago.`,
+                description: `Se corrigieron ${correctedCount} documentos de pago. Los reportes ahora mostrarán los datos actualizados.`,
             });
         } else {
             toast({
@@ -132,13 +168,13 @@ export default function ValidationPage() {
             });
         }
         
-        setFixLogs(logs);
+        setFixLogs(logs.length > 0 ? logs : ["No se encontraron logs para mostrar."]);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fixing payments:', error);
         toast({
             title: 'Error de Corrección',
-            description: 'Ocurrió un error al intentar corregir los pagos.',
+            description: error.message || 'Ocurrió un error al intentar corregir los pagos.',
             variant: 'destructive',
         });
     } finally {
@@ -177,10 +213,10 @@ export default function ValidationPage() {
 
        <Card>
         <CardHeader>
-          <CardTitle>Corregir Pagos sin Desglose</CardTitle>
+          <CardTitle>Corregir Pagos Históricos</CardTitle>
           <CardDescription>
-            Busca pagos históricos donde falte el desglose de capital e interés y los calcula asumiendo una tasa de interés fija del 4.6%.
-            Esta es una herramienta de uso específico para corregir datos.
+            Busca pagos antiguos sin desglose de capital/interés y/o con formato de fecha antiguo (DD/MM/YYYY). 
+            Calcula el desglose (interés del 4.6%) y estandariza la fecha para asegurar que todos los reportes funcionen correctamente.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-4">
@@ -190,7 +226,7 @@ export default function ValidationPage() {
             ) : (
               <Wrench className="mr-2 h-4 w-4" />
             )}
-            {isFixingPayments ? 'Corrigiendo Pagos...' : 'Iniciar Corrección de Pagos'}
+            {isFixingPayments ? 'Corrigiendo Pagos...' : 'Iniciar Corrección'}
           </Button>
           {fixLogs.length > 0 && (
             <div className="w-full mt-4">
