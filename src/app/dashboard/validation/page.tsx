@@ -2,18 +2,21 @@
 
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where } from 'firebase/firestore';
+import { collection, query, writeBatch, getDocs, where, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck } from 'lucide-react';
-import type { Installment } from '@/lib/data';
+import { Loader, ShieldCheck, Wrench, FileText } from 'lucide-react';
+import type { Installment, Payment } from '@/lib/data';
 import { isBefore, startOfToday } from 'date-fns';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function ValidationPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessingOverdue, setIsProcessingOverdue] = useState(false);
+  const [isFixingPayments, setIsFixingPayments] = useState(false);
+  const [fixLogs, setFixLogs] = useState<string[]>([]);
 
   const pendingInstallmentsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'pending')) : null),
@@ -31,7 +34,7 @@ export default function ValidationPage() {
       return;
     }
 
-    setIsProcessing(true);
+    setIsProcessingOverdue(true);
 
     const today = startOfToday();
     const installmentsToUpdate = pendingInstallments.filter(inst => {
@@ -44,7 +47,7 @@ export default function ValidationPage() {
         title: 'Sin Cambios',
         description: 'No se encontraron cuotas pendientes para marcar como atrasadas.',
       });
-      setIsProcessing(false);
+      setIsProcessingOverdue(false);
       return;
     }
 
@@ -69,9 +72,80 @@ export default function ValidationPage() {
         variant: 'destructive',
       });
     } finally {
-      setIsProcessing(false);
+      setIsProcessingOverdue(false);
     }
   };
+
+  const handleFixPayments = async () => {
+    if (!firestore) {
+        toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
+        return;
+    }
+    
+    setIsFixingPayments(true);
+    setFixLogs([]);
+    const logs: string[] = [];
+    let correctedCount = 0;
+    
+    try {
+        const paymentsQuery = query(collection(firestore, 'payments'));
+        const querySnapshot = await getDocs(paymentsQuery);
+        const batch = writeBatch(firestore);
+
+        querySnapshot.forEach(document => {
+            const payment = document.data() as Payment;
+            const paymentId = document.id;
+
+            const { totalAmount, capitalAmount, interestAmount } = payment;
+
+            const needsCorrection = !capitalAmount || !interestAmount || isNaN(capitalAmount) || isNaN(interestAmount);
+            
+            if (needsCorrection) {
+                if (totalAmount && !isNaN(totalAmount)) {
+                    const newInterest = parseFloat((totalAmount * 0.046).toFixed(2));
+                    const newCapital = parseFloat((totalAmount - newInterest).toFixed(2));
+                    
+                    const paymentRef = doc(firestore, 'payments', paymentId);
+                    batch.update(paymentRef, {
+                        capitalAmount: newCapital,
+                        interestAmount: newInterest
+                    });
+                    
+                    logs.push(`ID: ${paymentId} | Antes: (C: ${capitalAmount}, I: ${interestAmount}) -> Después: (C: ${newCapital}, I: ${newInterest})`);
+                    correctedCount++;
+                } else {
+                     logs.push(`ID: ${paymentId} | OMITIDO: montoTotalPagado no es válido.`);
+                }
+            }
+        });
+
+        if (correctedCount > 0) {
+            await batch.commit();
+            toast({
+                title: 'Corrección Completada',
+                description: `Se corrigieron ${correctedCount} documentos de pago.`,
+            });
+        } else {
+            toast({
+                title: 'Sin Cambios',
+                description: 'No se encontraron documentos de pago que necesitaran corrección.',
+            });
+        }
+        
+        setFixLogs(logs);
+
+    } catch (error) {
+        console.error('Error fixing payments:', error);
+        toast({
+            title: 'Error de Corrección',
+            description: 'Ocurrió un error al intentar corregir los pagos.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsFixingPayments(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,16 +164,47 @@ export default function ValidationPage() {
           <p className="text-sm text-muted-foreground">
             Actualmente hay <span className="font-bold text-foreground">{pendingInstallments?.length ?? 0}</span> cuota(s) pendientes por revisar.
           </p>
-          <Button onClick={handleUpdateOverdue} disabled={isProcessing}>
-            {isProcessing ? (
+          <Button onClick={handleUpdateOverdue} disabled={isProcessingOverdue}>
+            {isProcessingOverdue ? (
               <Loader className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <ShieldCheck className="mr-2 h-4 w-4" />
             )}
-            {isProcessing ? 'Procesando...' : 'Actualizar Cuotas Atrasadas'}
+            {isProcessingOverdue ? 'Procesando...' : 'Actualizar Cuotas Atrasadas'}
           </Button>
         </CardContent>
       </Card>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Corregir Pagos sin Desglose</CardTitle>
+          <CardDescription>
+            Busca pagos históricos donde falte el desglose de capital e interés y los calcula asumiendo una tasa de interés fija del 4.6%.
+            Esta es una herramienta de uso específico para corregir datos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-4">
+           <Button onClick={handleFixPayments} disabled={isFixingPayments}>
+            {isFixingPayments ? (
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Wrench className="mr-2 h-4 w-4" />
+            )}
+            {isFixingPayments ? 'Corrigiendo Pagos...' : 'Iniciar Corrección de Pagos'}
+          </Button>
+          {fixLogs.length > 0 && (
+            <div className="w-full mt-4">
+              <h3 className="font-semibold mb-2 flex items-center gap-2"><FileText className="h-4 w-4" />Log de Corrección:</h3>
+              <ScrollArea className="h-60 w-full rounded-md border p-4 bg-muted/50">
+                <pre className="text-xs whitespace-pre-wrap">
+                  {fixLogs.join('\n')}
+                </pre>
+              </ScrollArea>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
