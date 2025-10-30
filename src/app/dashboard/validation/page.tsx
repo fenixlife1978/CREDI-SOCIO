@@ -228,8 +228,8 @@ export default function ValidationPage() {
         }
         const newDateISO = newDate.toISOString();
 
-        const paymentRef = doc(firestore, 'payments', paymentIdToUpdate);
-        const installmentRef = doc(firestore, 'installments', installmentIdToUpdate);
+        const paymentRef = doc(firestore, 'payments', paymentIdToUpdate.trim());
+        const installmentRef = doc(firestore, 'installments', installmentIdToUpdate.trim());
 
         // Instead of a batch, call updates individually to get specific errors
         await updateDocumentAndHandleError(firestore, paymentRef, { paymentDate: newDateISO });
@@ -260,7 +260,8 @@ export default function ValidationPage() {
   };
 
   const handleRevertPayment = async () => {
-    if (!firestore || !paymentIdToRevert) {
+    const trimmedId = paymentIdToRevert.trim();
+    if (!firestore || !trimmedId) {
       toast({ title: 'Error', description: 'Por favor, proporciona el ID del pago a revertir.', variant: 'destructive' });
       return;
     }
@@ -269,11 +270,11 @@ export default function ValidationPage() {
 
     try {
         await runTransaction(firestore, async (transaction) => {
-            const paymentRef = doc(firestore, 'payments', paymentIdToRevert);
+            const paymentRef = doc(firestore, 'payments', trimmedId);
             const paymentDoc = await transaction.get(paymentRef);
 
             if (!paymentDoc.exists()) {
-                throw new Error(`El pago con ID ${paymentIdToRevert} no fue encontrado.`);
+                throw new Error(`El pago con ID ${trimmedId} no fue encontrado.`);
             }
 
             const paymentData = paymentDoc.data() as Payment;
@@ -308,7 +309,7 @@ export default function ValidationPage() {
 
         toast({
             title: '¡Pago Revertido!',
-            description: `El pago ${paymentIdToRevert} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
+            description: `El pago ${trimmedId} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
         });
         setPaymentIdToRevert('');
 
