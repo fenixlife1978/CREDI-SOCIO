@@ -1,5 +1,3 @@
-
-
 // This file now defines the data structures (types) for the application.
 // The actual data will be fetched from Firestore.
 
@@ -63,6 +61,5 @@ export type CompanyProfile = {
   phone: string;
   email: string;
   rif: string;
-  logoUrl: string;
+  logoUrl?: string; // Make logoUrl optional as it's no longer managed here
 };
-
