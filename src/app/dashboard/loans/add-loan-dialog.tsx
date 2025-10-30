@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, addMonths, parseISO } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const loanSchema = z.object({
   partnerId: z.string({ required_error: 'Debes seleccionar un socio.' }),
@@ -234,194 +235,104 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Editar Préstamo' : 'Añadir Nuevo Préstamo'}</DialogTitle>
           <DialogDescription>
             {isEditMode ? 'Actualiza la información del préstamo.' : 'Completa la información para registrar un nuevo préstamo.'}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="partnerId"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Socio</FormLabel>
-                  <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          disabled={isEditMode} // Disable changing partner on edit
-                          className={cn(
-                            'w-full justify-between',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value
-                            ? partners?.find(p => p.id === field.value)?.firstName + ' ' + partners?.find(p => p.id === field.value)?.lastName
-                            : 'Selecciona un socio'}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command>
-                        <CommandInput placeholder="Buscar socio..." />
-                        <CommandList>
-                          {partnersLoading && <CommandItem>Cargando...</CommandItem>}
-                          <CommandEmpty>No se encontraron socios.</CommandEmpty>
-                          <CommandGroup>
-                            {partners?.map(partner => (
-                              <CommandItem
-                                value={`${partner.firstName} ${partner.lastName} ${partner.alias || ''} ${partner.identificationNumber || ''}`}
-                                key={partner.id}
-                                onSelect={() => {
-                                  form.setValue('partnerId', partner.id);
-                                  setPopoverOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    partner.id === field.value ? 'opacity-100' : 'opacity-0'
-                                  )}
-                                />
-                                <div>
-                                  <p>{`${partner.firstName} ${partner.lastName}`}</p>
-                                  <p className='text-xs text-muted-foreground'>{partner.identificationNumber}</p>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="loanType"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Tipo de Préstamo</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex space-x-4"
-                      disabled={isEditMode} // Usually loan type is not editable
-                    >
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="standard" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Estándar</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="custom" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Personalizado</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="totalAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Monto Total</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="Ej: 1000" {...field} disabled={isEditMode} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {loanType === 'standard' && (
-              <>
+        <ScrollArea className="max-h-[80vh]">
+          <div className="p-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="numberOfInstallments"
+                  name="partnerId"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Número de Cuotas</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} disabled={isEditMode} />
-                      </FormControl>
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Socio</FormLabel>
+                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              disabled={isEditMode} // Disable changing partner on edit
+                              className={cn(
+                                'w-full justify-between',
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
+                              {field.value
+                                ? partners?.find(p => p.id === field.value)?.firstName + ' ' + partners?.find(p => p.id === field.value)?.lastName
+                                : 'Selecciona un socio'}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                          <Command>
+                            <CommandInput placeholder="Buscar socio..." />
+                            <CommandList>
+                              {partnersLoading && <CommandItem>Cargando...</CommandItem>}
+                              <CommandEmpty>No se encontraron socios.</CommandEmpty>
+                              <CommandGroup>
+                                {partners?.map(partner => (
+                                  <CommandItem
+                                    value={`${partner.firstName} ${partner.lastName} ${partner.alias || ''} ${partner.identificationNumber || ''}`}
+                                    key={partner.id}
+                                    onSelect={() => {
+                                      form.setValue('partnerId', partner.id);
+                                      setPopoverOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        'mr-2 h-4 w-4',
+                                        partner.id === field.value ? 'opacity-100' : 'opacity-0'
+                                      )}
+                                    />
+                                    <div>
+                                      <p>{`${partner.firstName} ${partner.lastName}`}</p>
+                                      <p className='text-xs text-muted-foreground'>{partner.identificationNumber}</p>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="interestRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tasa de Interés (%) Mensual</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
-            )}
 
-            {loanType === 'custom' && (
-              <>
                 <FormField
                   control={form.control}
-                  name="fixedInterestAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Monto de Interés Fijo (por cuota)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="hasTerm"
+                  name="loanType"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
-                      <FormLabel>¿Tiene plazo de pago?</FormLabel>
+                      <FormLabel>Tipo de Préstamo</FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
                           value={field.value}
                           className="flex space-x-4"
-                          disabled={isEditMode}
+                          disabled={isEditMode} // Usually loan type is not editable
                         >
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl>
-                              <RadioGroupItem value="yes" />
+                              <RadioGroupItem value="standard" />
                             </FormControl>
-                            <FormLabel className="font-normal">Sí (con cuotas)</FormLabel>
+                            <FormLabel className="font-normal">Estándar</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl>
-                              <RadioGroupItem value="no" />
+                              <RadioGroupItem value="custom" />
                             </FormControl>
-                            <FormLabel className="font-normal">No (abono libre)</FormLabel>
+                            <FormLabel className="font-normal">Personalizado</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
@@ -429,46 +340,140 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
                     </FormItem>
                   )}
                 />
-                {hasTerm === 'yes' && (
-                  <FormField
-                    control={form.control}
-                    name="numberOfInstallments"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Número de Cuotas</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} disabled={isEditMode} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
+                <FormField
+                  control={form.control}
+                  name="totalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monto Total</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Ej: 1000" {...field} disabled={isEditMode} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {loanType === 'standard' && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="numberOfInstallments"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número de Cuotas</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} disabled={isEditMode} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="interestRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tasa de Interés (%) Mensual</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="Ej: 5" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
                 )}
-              </>
-            )}
 
-             <FormField
-              control={form.control}
-              name="startDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fecha de Otorgamiento</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {loanType === 'custom' && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="fixedInterestAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monto de Interés Fijo (por cuota)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="Ej: 100 (o 0 si no hay interés)" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="hasTerm"
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel>¿Tiene plazo de pago?</FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              className="flex space-x-4"
+                              disabled={isEditMode}
+                            >
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <RadioGroupItem value="yes" />
+                                </FormControl>
+                                <FormLabel className="font-normal">Sí (con cuotas)</FormLabel>
+                              </FormItem>
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <RadioGroupItem value="no" />
+                                </FormControl>
+                                <FormLabel className="font-normal">No (abono libre)</FormLabel>
+                              </FormItem>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {hasTerm === 'yes' && (
+                      <FormField
+                        control={form.control}
+                        name="numberOfInstallments"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Número de Cuotas</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="Ej: 12" {...field} value={field.value ?? ''} disabled={isEditMode} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </>
+                )}
 
-            <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditMode ? 'Guardar Cambios' : 'Guardar Préstamo'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                 <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fecha de Otorgamiento</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="sticky bottom-0 bg-background pt-4">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                    {isEditMode ? 'Guardar Cambios' : 'Guardar Préstamo'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
