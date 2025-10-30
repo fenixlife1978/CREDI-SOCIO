@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useDoc, useFirestore, useStorage } from '@/firebase';
+import { useDoc, useFirestore } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -70,7 +70,10 @@ export default function SettingsPage() {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file || !storage) {
+        toast({ title: 'Error', description: 'El servicio de almacenamiento no está disponible.', variant: 'destructive' });
+        return;
+    };
 
     setIsUploading(true);
     try {
