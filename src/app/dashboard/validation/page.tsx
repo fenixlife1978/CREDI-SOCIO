@@ -102,7 +102,7 @@ export default function ValidationPage() {
 
             const { totalAmount, capitalAmount, interestAmount, paymentDate } = payment;
 
-            let needsCorrection = !capitalAmount || !interestAmount || isNaN(capitalAmount) || isNaN(interestAmount);
+            let needsCorrection = false;
             let newPaymentDateISO: string | null = null;
             
             // Date correction logic
@@ -125,9 +125,10 @@ export default function ValidationPage() {
             }
 
 
-            const breakdownMissing = !capitalAmount || !interestAmount || isNaN(capitalAmount) || isNaN(interestAmount);
+            const breakdownMissing = capitalAmount === null || capitalAmount === undefined || isNaN(capitalAmount) || interestAmount === null || interestAmount === undefined || isNaN(interestAmount);
 
             if (breakdownMissing) {
+                needsCorrection = true;
                 if (totalAmount && !isNaN(totalAmount)) {
                     const newInterest = parseFloat((totalAmount * 0.046).toFixed(2));
                     const newCapital = parseFloat((totalAmount - newInterest).toFixed(2));
@@ -152,6 +153,7 @@ export default function ValidationPage() {
                  const paymentRef = doc(firestore, 'payments', paymentId);
                  batch.update(paymentRef, { paymentDate: newPaymentDateISO });
                  correctedCount++;
+                 needsCorrection = true;
             }
         }
 
