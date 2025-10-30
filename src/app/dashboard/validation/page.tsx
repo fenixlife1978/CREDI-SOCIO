@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where, doc, updateDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,22 @@ import { isBefore, startOfToday, parse } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
+async function updateDocumentAndHandleError(db: Firestore, docRef: any, updateData: any) {
+    try {
+        await updateDoc(docRef, updateData);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        // Re-throw the original error to stop the execution flow of the calling function
+        throw serverError;
+    }
+}
+
 
 export default function ValidationPage() {
   const firestore = useFirestore();
@@ -212,13 +228,10 @@ export default function ValidationPage() {
         const paymentRef = doc(firestore, 'payments', paymentIdToUpdate);
         const installmentRef = doc(firestore, 'installments', installmentIdToUpdate);
 
-        const batch = writeBatch(firestore);
+        // Instead of a batch, call updates individually to get specific errors
+        await updateDocumentAndHandleError(firestore, paymentRef, { paymentDate: newDateISO });
+        await updateDocumentAndHandleError(firestore, installmentRef, { paymentDate: newDateISO });
         
-        batch.update(paymentRef, { paymentDate: newDateISO });
-        batch.update(installmentRef, { paymentDate: newDateISO });
-        
-        await batch.commit();
-
         toast({
             title: '¡Fecha Actualizada!',
             description: `Se actualizó la fecha del pago y la cuota a ${newPaymentDate}.`,
@@ -229,12 +242,15 @@ export default function ValidationPage() {
         setNewPaymentDate('');
 
     } catch (error: any) {
-         console.error('Error updating payment date:', error);
-        toast({
-            title: 'Error al Actualizar',
-            description: error.message || 'Ocurrió un error. Verifica los IDs y la fecha.',
-            variant: 'destructive',
-        });
+        // Error is already emitted, just show a generic toast.
+        // We check for 'FirebaseError' name to avoid showing toasts for our manually thrown errors.
+        if (error.name !== 'FirebaseError') {
+             toast({
+                title: 'Error al Actualizar',
+                description: 'No se pudo completar la actualización. Revisa la consola para más detalles.',
+                variant: 'destructive',
+            });
+        }
     } finally {
         setIsUpdatingPaymentDate(false);
     }
