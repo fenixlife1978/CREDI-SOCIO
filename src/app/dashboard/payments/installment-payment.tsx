@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -51,6 +51,8 @@ import { Loader } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
 
 const paymentSchema = z.object({
   partnerId: z.string({ required_error: 'Debes seleccionar un socio.' }).min(1),
@@ -58,7 +60,7 @@ const paymentSchema = z.object({
   paymentDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: 'La fecha de pago es inválida.',
   }),
-  selectedInstallments: z.record(z.boolean()).refine(val => Object.values(val).some(v => v), {
+  selectedInstallmentIds: z.array(z.string()).refine(val => val.length > 0, {
     message: "Debes seleccionar al menos una cuota para pagar."
   }),
 });
@@ -84,13 +86,13 @@ export default function InstallmentPayment() {
       paymentDate: format(new Date(), 'yyyy-MM-dd'),
       partnerId: '',
       loanId: '',
-      selectedInstallments: {},
+      selectedInstallmentIds: [],
     },
   });
 
   const selectedPartnerId = form.watch('partnerId');
   const selectedLoanId = form.watch('loanId');
-  const selectedInstallments = form.watch('selectedInstallments');
+  const selectedInstallmentIds = form.watch('selectedInstallmentIds');
 
   const partnerLoansQuery = useMemoFirebase(
     () =>
@@ -127,21 +129,21 @@ export default function InstallmentPayment() {
   // Reset logic
   useEffect(() => {
     form.resetField('loanId');
-    form.setValue('selectedInstallments', {});
+    form.setValue('selectedInstallmentIds', []);
   }, [selectedPartnerId, form]);
 
   useEffect(() => {
-    form.setValue('selectedInstallments', {});
+    form.setValue('selectedInstallmentIds', []);
   }, [selectedLoanId, form]);
 
 
   // Calculate total amount
   useEffect(() => {
     const amount = sortedInstallments
-        .filter(inst => selectedInstallments[inst.id])
+        .filter(inst => selectedInstallmentIds.includes(inst.id))
         .reduce((sum, inst) => sum + inst.totalAmount, 0);
     setTotalAmount(amount);
-  }, [selectedInstallments, sortedInstallments]);
+  }, [selectedInstallmentIds, sortedInstallments]);
   
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
@@ -153,8 +155,7 @@ export default function InstallmentPayment() {
   const onSubmit = async (data: PaymentFormData) => {
     if (!firestore || !loanInstallments) return;
 
-    const installmentIdsToPay = Object.keys(data.selectedInstallments).filter(id => data.selectedInstallments[id]);
-    const installmentsToPay = loanInstallments.filter(inst => installmentIdsToPay.includes(inst.id));
+    const installmentsToPay = loanInstallments.filter(inst => data.selectedInstallmentIds.includes(inst.id));
 
     if (installmentsToPay.length === 0) {
       toast({ title: 'Error', description: 'No hay cuotas seleccionadas.', variant: 'destructive' });
@@ -175,7 +176,7 @@ export default function InstallmentPayment() {
       batch.set(paymentRef, {
         partnerId: data.partnerId,
         loanId: data.loanId,
-        installmentIds: installmentIdsToPay,
+        installmentIds: data.selectedInstallmentIds,
         paymentDate: new Date(data.paymentDate).toISOString(),
         totalAmount: totalAmount,
         capitalAmount: totalCapital,
@@ -196,7 +197,7 @@ export default function InstallmentPayment() {
       const allDocs = allInstallmentsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
 
       const isLoanComplete = allDocs.every(
-        inst => inst.status === 'paid' || data.selectedInstallments[inst.id]
+        inst => inst.status === 'paid' || data.selectedInstallmentIds.includes(inst.id)
       );
 
       if (isLoanComplete) {
@@ -215,7 +216,7 @@ export default function InstallmentPayment() {
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
         partnerId: data.partnerId,
         loanId: data.loanId,
-        selectedInstallments: {},
+        selectedInstallmentIds: [],
       });
 
     } catch (error) {
@@ -230,14 +231,6 @@ export default function InstallmentPayment() {
     }
   };
   
-  const handleSelectAll = (checked: boolean) => {
-    const newSelection: Record<string, boolean> = {};
-    if (checked) {
-      sortedInstallments.forEach(inst => newSelection[inst.id] = true);
-    }
-    form.setValue('selectedInstallments', newSelection);
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -298,26 +291,30 @@ export default function InstallmentPayment() {
             
             {/* Installments Table */}
             {selectedLoanId && (
-              <div className="space-y-2">
-                <FormLabel>Cuotas Pendientes</FormLabel>
-                {installmentsLoading && <p>Cargando cuotas...</p>}
-                {!installmentsLoading && sortedInstallments.length === 0 && <p className="text-sm text-muted-foreground pt-2">Este préstamo no tiene cuotas pendientes.</p>}
-                {!installmentsLoading && sortedInstallments.length > 0 && (
-                   <FormField
-                    control={form.control}
-                    name="selectedInstallments"
-                    render={() => (
-                      <FormItem>
-                        <div className="rounded-md border">
+              <Controller
+                control={form.control}
+                name="selectedInstallmentIds"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel>Cuotas Pendientes</FormLabel>
+                    {installmentsLoading && <p>Cargando cuotas...</p>}
+                    {!installmentsLoading && sortedInstallments.length === 0 && <p className="text-sm text-muted-foreground pt-2">Este préstamo no tiene cuotas pendientes.</p>}
+                    {!installmentsLoading && sortedInstallments.length > 0 && (
+                       <div className={cn("rounded-md border", fieldState.error && "border-destructive")}>
                             <Table>
                             <TableHeader>
                                 <TableRow>
                                 <TableHead className="w-12">
                                     <Checkbox
-                                        onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            field.onChange(sortedInstallments.map(i => i.id));
+                                          } else {
+                                            field.onChange([]);
+                                          }
+                                        }}
                                         checked={
-                                        sortedInstallments.length > 0 &&
-                                        sortedInstallments.every(inst => selectedInstallments[inst.id])
+                                          field.value?.length === sortedInstallments.length && sortedInstallments.length > 0
                                         }
                                         aria-label="Seleccionar todo"
                                     />
@@ -332,20 +329,18 @@ export default function InstallmentPayment() {
                                 {sortedInstallments.map((installment) => (
                                 <TableRow key={installment.id}>
                                     <TableCell>
-                                    <FormField
-                                        control={form.control}
-                                        name={`selectedInstallments.${installment.id}`}
-                                        render={({ field }) => (
-                                        <FormItem className="flex items-center">
-                                             <FormControl>
-                                                <Checkbox
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                             </FormControl>
-                                        </FormItem>
-                                        )}
-                                    />
+                                      <Checkbox
+                                        checked={field.value?.includes(installment.id)}
+                                        onCheckedChange={(checked) => {
+                                          return checked
+                                            ? field.onChange([...(field.value || []), installment.id])
+                                            : field.onChange(
+                                                (field.value || []).filter(
+                                                  (value) => value !== installment.id
+                                                )
+                                              );
+                                        }}
+                                      />
                                     </TableCell>
                                     <TableCell>{installment.installmentNumber}</TableCell>
                                     <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
@@ -360,12 +355,11 @@ export default function InstallmentPayment() {
                             </TableBody>
                             </Table>
                         </div>
-                        <FormMessage />
-                      </FormItem>
                     )}
-                  />
+                     <FormMessage />
+                  </FormItem>
                 )}
-              </div>
+              />
             )}
             
              <FormField
