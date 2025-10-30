@@ -127,12 +127,13 @@ export default function InstallmentPayment() {
   // Reset logic
   useEffect(() => {
     form.resetField('loanId');
-    form.resetField('selectedInstallments');
+    form.setValue('selectedInstallments', {});
   }, [selectedPartnerId, form]);
 
   useEffect(() => {
-    form.resetField('selectedInstallments');
+    form.setValue('selectedInstallments', {});
   }, [selectedLoanId, form]);
+
 
   // Calculate total amount
   useEffect(() => {
@@ -302,56 +303,68 @@ export default function InstallmentPayment() {
                 {installmentsLoading && <p>Cargando cuotas...</p>}
                 {!installmentsLoading && sortedInstallments.length === 0 && <p className="text-sm text-muted-foreground pt-2">Este préstamo no tiene cuotas pendientes.</p>}
                 {!installmentsLoading && sortedInstallments.length > 0 && (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">
-                             <Checkbox
-                                onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
-                                checked={
-                                  sortedInstallments.length > 0 &&
-                                  sortedInstallments.every(inst => selectedInstallments[inst.id])
-                                }
-                                aria-label="Seleccionar todo"
-                              />
-                          </TableHead>
-                          <TableHead>#</TableHead>
-                          <TableHead>Vencimiento</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sortedInstallments.map((installment) => (
-                          <TableRow key={installment.id}>
-                             <TableCell>
-                                <FormField
-                                  control={form.control}
-                                  name={`selectedInstallments.${installment.id}`}
-                                  render={({ field }) => (
+                   <FormField
+                    control={form.control}
+                    name="selectedInstallments"
+                    render={() => (
+                      <FormItem>
+                        <div className="rounded-md border">
+                            <Table>
+                            <TableHeader>
+                                <TableRow>
+                                <TableHead className="w-12">
                                     <Checkbox
-                                      checked={field.value}
-                                      onCheckedChange={field.onChange}
+                                        onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+                                        checked={
+                                        sortedInstallments.length > 0 &&
+                                        sortedInstallments.every(inst => selectedInstallments[inst.id])
+                                        }
+                                        aria-label="Seleccionar todo"
                                     />
-                                  )}
-                                />
-                            </TableCell>
-                            <TableCell>{installment.installmentNumber}</TableCell>
-                            <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
-                            <TableCell>
-                              <Badge variant={installment.status === 'overdue' ? 'destructive' : 'outline'}>
-                                {installment.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">{currencyFormatter.format(installment.totalAmount)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                </TableHead>
+                                <TableHead>#</TableHead>
+                                <TableHead>Vencimiento</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Monto</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {sortedInstallments.map((installment) => (
+                                <TableRow key={installment.id}>
+                                    <TableCell>
+                                    <FormField
+                                        control={form.control}
+                                        name={`selectedInstallments.${installment.id}`}
+                                        render={({ field }) => (
+                                        <FormItem className="flex items-center">
+                                             <FormControl>
+                                                <Checkbox
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                             </FormControl>
+                                        </FormItem>
+                                        )}
+                                    />
+                                    </TableCell>
+                                    <TableCell>{installment.installmentNumber}</TableCell>
+                                    <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>
+                                    <Badge variant={installment.status === 'overdue' ? 'destructive' : 'outline'}>
+                                        {installment.status}
+                                    </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">{currencyFormatter.format(installment.totalAmount)}</TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                            </Table>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-                 <FormMessage>{form.formState.errors.selectedInstallments?.message}</FormMessage>
               </div>
             )}
             
