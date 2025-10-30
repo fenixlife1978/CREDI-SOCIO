@@ -71,8 +71,8 @@ function PaidPaymentsTab() {
     });
 
     const calculatedTotals = filtered.reduce((acc, p) => {
-      acc.capital += p.capitalAmount;
-      acc.interest += p.interestAmount;
+      acc.capital += p.capitalAmount || 0;
+      acc.interest += p.interestAmount || 0;
       acc.total += p.totalAmount;
       return acc;
     }, { capital: 0, interest: 0, total: 0 });
