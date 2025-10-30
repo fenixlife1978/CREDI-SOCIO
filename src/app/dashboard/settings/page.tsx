@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -17,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader, Upload } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { CompanyProfile } from '@/lib/data';
+import { useFirebase } from '@/firebase/provider';
 
 const settingsSchema = z.object({
   companyName: z.string().min(1, 'El nombre de la empresa es requerido.'),
@@ -30,8 +30,7 @@ const settingsSchema = z.object({
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export default function SettingsPage() {
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const { firestore, storage } = useFirebase();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -71,7 +70,7 @@ export default function SettingsPage() {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !storage) return;
 
     setIsUploading(true);
     try {
