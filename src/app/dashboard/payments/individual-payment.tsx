@@ -51,8 +51,8 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 const paymentSchema = z.object({
-  partnerId: z.string({ required_error: 'Debes seleccionar un socio.' }),
-  loanId: z.string({ required_error: 'Debes seleccionar un préstamo.' }),
+  partnerId: z.string({ required_error: 'Debes seleccionar un socio.' }).min(1, 'Debes seleccionar un socio.'),
+  loanId: z.string({ required_error: 'Debes seleccionar un préstamo.' }).min(1, 'Debes seleccionar un préstamo.'),
   amount: z.coerce
     .number()
     .min(1, 'El monto del abono debe ser mayor a 0.'),
@@ -78,7 +78,10 @@ export default function IndividualPayment() {
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
+      amount: 0,
       paymentDate: format(new Date(), 'yyyy-MM-dd'),
+      partnerId: '',
+      loanId: '',
     },
   });
 
@@ -210,7 +213,7 @@ export default function IndividualPayment() {
                   <FormLabel>Socio</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={partnersLoading}
                   >
                     <FormControl>
