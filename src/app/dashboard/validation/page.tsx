@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestore, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestore, getDoc, runTransaction, addDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2 } from 'lucide-react';
-import type { Installment, Payment, Loan } from '@/lib/data';
+import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt } from 'lucide-react';
+import type { Installment, Payment, Loan, Partner } from '@/lib/data';
 import { isBefore, startOfToday, parse } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,7 @@ export default function ValidationPage() {
   const { toast } = useToast();
   const [isProcessingOverdue, setIsProcessingOverdue] = useState(false);
   const [isFixingPayments, setIsFixingPayments] = useState(false);
+  const [isGeneratingReceipts, setIsGeneratingReceipts] = useState(false);
   const [isUpdatingPaymentDate, setIsUpdatingPaymentDate] = useState(false);
   const [isRevertingPayment, setIsRevertingPayment] = useState(false);
   const [fixLogs, setFixLogs] = useState<string[]>([]);
@@ -102,6 +103,84 @@ export default function ValidationPage() {
       });
     } finally {
       setIsProcessingOverdue(false);
+    }
+  };
+
+  const handleGenerateMissingReceipts = async () => {
+    if (!firestore) {
+      toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
+      return;
+    }
+    setIsGeneratingReceipts(true);
+    
+    try {
+      const paidInstallmentsQuery = query(
+        collection(firestore, 'installments'),
+        where('status', '==', 'paid'),
+        where('receiptId', '==', null)
+      );
+      
+      const partnersQuery = query(collection(firestore, 'partners'));
+      
+      const [installmentsSnapshot, partnersSnapshot] = await Promise.all([
+        getDocs(paidInstallmentsQuery),
+        getDocs(partnersQuery),
+      ]);
+      
+      const partnersMap = new Map(partnersSnapshot.docs.map(doc => [doc.id, doc.data() as Partner]));
+      const installmentsToProcess = installmentsSnapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Installment[];
+
+      if (installmentsToProcess.length === 0) {
+        toast({ title: 'Sin Cambios', description: 'No se encontraron cuotas pagadas sin recibo.' });
+        setIsGeneratingReceipts(false);
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      let receiptsGenerated = 0;
+
+      for (const inst of installmentsToProcess) {
+        const partner = partnersMap.get(inst.partnerId);
+        const newReceiptRef = doc(collection(firestore, 'receipts'));
+
+        batch.set(newReceiptRef, {
+            type: 'installment_payment' as const,
+            partnerId: inst.partnerId,
+            loanId: inst.loanId,
+            paymentId: inst.paymentId,
+            installmentId: inst.id,
+            generationDate: inst.paymentDate || new Date().toISOString(),
+            amount: inst.totalAmount,
+            partnerName: partner ? `${partner.firstName} ${partner.lastName}` : inst.partnerId,
+            partnerIdentification: partner?.identificationNumber || '',
+            installmentDetails: {
+                installmentNumber: inst.installmentNumber,
+                capitalAmount: inst.capitalAmount,
+                interestAmount: inst.interestAmount,
+            },
+        });
+        
+        const installmentRef = doc(firestore, 'installments', inst.id);
+        batch.update(installmentRef, { receiptId: newReceiptRef.id });
+        receiptsGenerated++;
+      }
+
+      await batch.commit();
+
+      toast({
+        title: '¡Recibos Generados!',
+        description: `Se generaron ${receiptsGenerated} nuevos recibos para pagos antiguos.`,
+      });
+
+    } catch (error: any) {
+      console.error('Error generating missing receipts:', error);
+      toast({
+        title: 'Error de Generación',
+        description: error.message || 'Ocurrió un error al intentar generar los recibos.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingReceipts(false);
     }
   };
 
@@ -341,6 +420,21 @@ export default function ValidationPage() {
       <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Validación de Datos</h1>
       </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Generar Recibos Faltantes</CardTitle>
+                <CardDescription>
+                Esta herramienta busca cuotas pagadas que no tienen un recibo asociado y los genera retroactivamente.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleGenerateMissingReceipts} disabled={isGeneratingReceipts}>
+                    {isGeneratingReceipts ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Receipt className="mr-2 h-4 w-4" />}
+                    {isGeneratingReceipts ? 'Generando...' : 'Generar Recibos para Pagos Antiguos'}
+                </Button>
+            </CardContent>
+        </Card>
 
        <Card>
         <CardHeader>
