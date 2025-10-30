@@ -62,30 +62,32 @@ function PaidPaymentsTab() {
   );
   const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
 
-  const { filteredPayments, totalPaid } = useMemo(() => {
-    if (!payments) return { filteredPayments: [], totalPaid: 0 };
+  const { filteredPayments, totals } = useMemo(() => {
+    if (!payments) return { filteredPayments: [], totals: { capital: 0, interest: 0, total: 0 } };
     
     const filtered = payments.filter(p => {
       const paymentDate = parseISO(p.paymentDate);
       return getMonth(paymentDate) === selectedMonth && getYear(paymentDate) === selectedYear;
     });
 
-    const totals = filtered.reduce((acc, p) => {
-      acc.totalPaid += p.totalAmount;
+    const calculatedTotals = filtered.reduce((acc, p) => {
+      acc.capital += p.capitalAmount;
+      acc.interest += p.interestAmount;
+      acc.total += p.totalAmount;
       return acc;
-    }, { totalPaid: 0 });
+    }, { capital: 0, interest: 0, total: 0 });
 
     return { 
       filteredPayments: filtered.sort((a,b) => parseISO(a.paymentDate).getTime() - parseISO(b.paymentDate).getTime()), 
-      totalPaid: totals.totalPaid,
+      totals: calculatedTotals,
     };
   }, [payments, selectedMonth, selectedYear]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Reporte de Pagos Realizados</CardTitle>
-        <CardDescription>Filtra los pagos por mes y año.</CardDescription>
+        <CardTitle>Reporte de Cuotas Pagadas</CardTitle>
+        <CardDescription>Filtra las cuotas pagadas por mes y año de pago.</CardDescription>
         <div className="flex gap-2 pt-4">
           <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
             <SelectTrigger className="w-[180px]">
@@ -120,6 +122,8 @@ function PaidPaymentsTab() {
             <TableRow>
               <TableHead>Socio</TableHead>
               <TableHead>Fecha de Pago</TableHead>
+              <TableHead className="text-right">Capital Pagado</TableHead>
+              <TableHead className="text-right">Interés Pagado</TableHead>
               <TableHead className="text-right">Monto Total Pagado</TableHead>
             </TableRow>
           </TableHeader>
@@ -128,12 +132,14 @@ function PaidPaymentsTab() {
               <TableRow key={payment.id}>
                 <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
                 <TableCell>{format(parseISO(payment.paymentDate), 'dd/MM/yyyy')}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(payment.capitalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(payment.interestAmount)}</TableCell>
                 <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
               </TableRow>
             ))}
             {filteredPayments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center">
+                <TableCell colSpan={5} className="h-24 text-center">
                   No hay pagos para este período.
                 </TableCell>
               </TableRow>
@@ -143,8 +149,14 @@ function PaidPaymentsTab() {
       </CardContent>
       {!isLoading && filteredPayments.length > 0 && (
         <CardFooter className="flex-col items-end gap-2">
+            <div className="text-lg font-semibold">
+                Total Capital Pagado: {currencyFormatter.format(totals.capital)}
+            </div>
+             <div className="text-lg font-semibold">
+                Total Interés Pagado: {currencyFormatter.format(totals.interest)}
+            </div>
             <div className="text-xl font-bold">
-                Total General Pagado: {currencyFormatter.format(totalPaid)}
+                Total General Pagado: {currencyFormatter.format(totals.total)}
             </div>
         </CardFooter>
       )}
