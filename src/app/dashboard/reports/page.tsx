@@ -62,8 +62,8 @@ function PaidPaymentsTab() {
   );
   const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
 
-  const { filteredPayments, totalPaid, totalCapital, totalInterest } = useMemo(() => {
-    if (!payments) return { filteredPayments: [], totalPaid: 0, totalCapital: 0, totalInterest: 0 };
+  const { filteredPayments, totalPaid } = useMemo(() => {
+    if (!payments) return { filteredPayments: [], totalPaid: 0 };
     
     const filtered = payments.filter(p => {
       const paymentDate = parseISO(p.paymentDate);
@@ -72,16 +72,12 @@ function PaidPaymentsTab() {
 
     const totals = filtered.reduce((acc, p) => {
       acc.totalPaid += p.totalAmount;
-      acc.totalCapital += p.capitalAmount;
-      acc.totalInterest += p.interestAmount;
       return acc;
-    }, { totalPaid: 0, totalCapital: 0, totalInterest: 0 });
+    }, { totalPaid: 0 });
 
     return { 
       filteredPayments: filtered.sort((a,b) => parseISO(a.paymentDate).getTime() - parseISO(b.paymentDate).getTime()), 
       totalPaid: totals.totalPaid,
-      totalCapital: totals.totalCapital,
-      totalInterest: totals.totalInterest,
     };
   }, [payments, selectedMonth, selectedYear]);
 
@@ -124,8 +120,6 @@ function PaidPaymentsTab() {
             <TableRow>
               <TableHead>Socio</TableHead>
               <TableHead>Fecha de Pago</TableHead>
-              <TableHead className="text-right">Capital Pagado</TableHead>
-              <TableHead className="text-right">Interés Pagado</TableHead>
               <TableHead className="text-right">Monto Total Pagado</TableHead>
             </TableRow>
           </TableHeader>
@@ -134,14 +128,12 @@ function PaidPaymentsTab() {
               <TableRow key={payment.id}>
                 <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
                 <TableCell>{format(parseISO(payment.paymentDate), 'dd/MM/yyyy')}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.capitalAmount)}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.interestAmount)}</TableCell>
                 <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
               </TableRow>
             ))}
             {filteredPayments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={3} className="h-24 text-center">
                   No hay pagos para este período.
                 </TableCell>
               </TableRow>
@@ -151,12 +143,6 @@ function PaidPaymentsTab() {
       </CardContent>
       {!isLoading && filteredPayments.length > 0 && (
         <CardFooter className="flex-col items-end gap-2">
-            <div className="text-lg font-semibold">
-                Total Capital Pagado: {currencyFormatter.format(totalCapital)}
-            </div>
-             <div className="text-lg font-semibold">
-                Total Interés Pagado: {currencyFormatter.format(totalInterest)}
-            </div>
             <div className="text-xl font-bold">
                 Total General Pagado: {currencyFormatter.format(totalPaid)}
             </div>
@@ -320,4 +306,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
