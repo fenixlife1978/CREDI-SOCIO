@@ -14,9 +14,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trash2, Loader } from 'lucide-react';
+import { Trash2, Loader, CalendarX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 const months = Array.from({ length: 12 }, (_, i) => ({
   value: i,
@@ -154,6 +156,8 @@ export default function RegisterPaymentPage() {
   const [selectedInstallments, setSelectedInstallments] = useState<Record<string, boolean>>({});
   const [isCleaning, setIsCleaning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isClosingMonth, setIsClosingMonth] = useState(false);
+  const [isCloseMonthAlertOpen, setIsCloseMonthAlertOpen] = useState(false);
 
   const installmentsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'installments'), where('status', 'in', ['pending', 'overdue'])) : null),
@@ -187,9 +191,9 @@ export default function RegisterPaymentPage() {
 
     installments.forEach(inst => {
       const dueDate = parseISO(inst.dueDate);
-      if (getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear) {
+      if (inst.status === 'pending' && getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear) {
         current.push(inst);
-      } else if (isBefore(dueDate, startOfSelectedMonth) && inst.status === 'overdue') {
+      } else if (inst.status === 'overdue' || (inst.status === 'pending' && isBefore(dueDate, startOfSelectedMonth))) {
         overdue.push(inst);
       }
     });
@@ -364,6 +368,52 @@ export default function RegisterPaymentPage() {
     }
   };
 
+  const handleCloseMonth = async () => {
+    if (!firestore) return;
+
+    // Find unpaid installments from the CURRENT month's table that were NOT selected.
+    const unpaidCurrentMonthInstallments = currentMonthInstallments.filter(
+      inst => !selectedInstallments[inst.id]
+    );
+
+    if (unpaidCurrentMonthInstallments.length === 0) {
+      toast({
+        title: 'Nada para cerrar',
+        description: 'Todas las cuotas del mes actual fueron pagadas o no hay cuotas para este mes.',
+      });
+      setIsCloseMonthAlertOpen(false);
+      return;
+    }
+
+    setIsClosingMonth(true);
+
+    try {
+      const batch = writeBatch(firestore);
+      unpaidCurrentMonthInstallments.forEach(inst => {
+        const installmentRef = doc(firestore, 'installments', inst.id);
+        batch.update(installmentRef, { status: 'overdue' });
+      });
+
+      await batch.commit();
+
+      toast({
+        title: '¡Mes Cerrado!',
+        description: `${unpaidCurrentMonthInstallments.length} cuota(s) no pagada(s) se marcaron como atrasadas.`,
+      });
+
+    } catch (error) {
+      console.error("Error closing month:", error);
+      toast({
+        title: 'Error al Cerrar el Mes',
+        description: 'Ocurrió un error. Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsClosingMonth(false);
+      setIsCloseMonthAlertOpen(false);
+    }
+  };
+
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
@@ -374,6 +424,7 @@ export default function RegisterPaymentPage() {
   const isLoading = installmentsLoading || partnersLoading || loansLoading;
 
   return (
+    <>
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div>
@@ -439,9 +490,17 @@ export default function RegisterPaymentPage() {
         </Button>
         <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => router.back()}>Cancelar</Button>
+            <Button
+                variant="destructive"
+                onClick={() => setIsCloseMonthAlertOpen(true)}
+                disabled={isProcessing || isClosingMonth}
+                >
+                <CalendarX className="mr-2 h-4 w-4" />
+                Cerrar Mes
+            </Button>
             <Button 
             onClick={handleProcessPayments}
-            disabled={isProcessing || Object.values(selectedInstallments).every(v => !v)}
+            disabled={isProcessing || isClosingMonth || Object.values(selectedInstallments).every(v => !v)}
             >
             {isProcessing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
             Procesar Pagos Seleccionados
@@ -449,5 +508,24 @@ export default function RegisterPaymentPage() {
         </div>
       </div>
     </div>
+    
+      <AlertDialog open={isCloseMonthAlertOpen} onOpenChange={setIsCloseMonthAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que quieres cerrar el mes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción marcará todas las cuotas del mes actual que NO estén seleccionadas como "atrasadas". No podrás revertir esta acción directamente. Las cuotas seleccionadas no se verán afectadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseMonth} disabled={isClosingMonth}>
+                {isClosingMonth && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                Sí, cerrar mes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
