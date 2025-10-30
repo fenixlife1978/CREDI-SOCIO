@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestore } from 'firebase/firestore';
+import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestore, getDoc, runTransaction } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck, Wrench, FileText, Edit } from 'lucide-react';
-import type { Installment, Payment } from '@/lib/data';
+import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2 } from 'lucide-react';
+import type { Installment, Payment, Loan } from '@/lib/data';
 import { isBefore, startOfToday, parse } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -35,10 +35,13 @@ export default function ValidationPage() {
   const [isProcessingOverdue, setIsProcessingOverdue] = useState(false);
   const [isFixingPayments, setIsFixingPayments] = useState(false);
   const [isUpdatingPaymentDate, setIsUpdatingPaymentDate] = useState(false);
+  const [isRevertingPayment, setIsRevertingPayment] = useState(false);
   const [fixLogs, setFixLogs] = useState<string[]>([]);
   const [paymentIdToUpdate, setPaymentIdToUpdate] = useState('');
   const [installmentIdToUpdate, setInstallmentIdToUpdate] = useState('');
   const [newPaymentDate, setNewPaymentDate] = useState('');
+  const [paymentIdToRevert, setPaymentIdToRevert] = useState('');
+
 
   const pendingInstallmentsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'pending')) : null),
@@ -256,12 +259,100 @@ export default function ValidationPage() {
     }
   };
 
+  const handleRevertPayment = async () => {
+    if (!firestore || !paymentIdToRevert) {
+      toast({ title: 'Error', description: 'Por favor, proporciona el ID del pago a revertir.', variant: 'destructive' });
+      return;
+    }
+
+    setIsRevertingPayment(true);
+
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const paymentRef = doc(firestore, 'payments', paymentIdToRevert);
+            const paymentDoc = await transaction.get(paymentRef);
+
+            if (!paymentDoc.exists()) {
+                throw new Error(`El pago con ID ${paymentIdToRevert} no fue encontrado.`);
+            }
+
+            const paymentData = paymentDoc.data() as Payment;
+            const { installmentIds, loanId } = paymentData;
+
+            // 1. Delete the payment document
+            transaction.delete(paymentRef);
+
+            // 2. Revert installment status
+            for (const installmentId of installmentIds) {
+                const installmentRef = doc(firestore, 'installments', installmentId);
+                const installmentDoc = await transaction.get(installmentRef);
+                 if (installmentDoc.exists()) {
+                    const installmentData = installmentDoc.data() as Installment;
+                    // Revert status to 'pending' or 'overdue' based on due date
+                    const dueDate = new Date(installmentData.dueDate);
+                    const newStatus = isBefore(dueDate, startOfToday()) ? 'overdue' : 'pending';
+                    transaction.update(installmentRef, { status: newStatus, paymentDate: null });
+                }
+            }
+
+            // 3. Revert loan status if it was 'Finalizado'
+            if (loanId) {
+                const loanRef = doc(firestore, 'loans', loanId);
+                const loanDoc = await transaction.get(loanRef);
+                if (loanDoc.exists() && loanDoc.data().status === 'Finalizado') {
+                    // A simple status change. A more complex app might need to check if other installments are still pending.
+                    transaction.update(loanRef, { status: 'Active' });
+                }
+            }
+        });
+
+        toast({
+            title: '¡Pago Revertido!',
+            description: `El pago ${paymentIdToRevert} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
+        });
+        setPaymentIdToRevert('');
+
+    } catch (error: any) {
+        console.error('Error reverting payment:', error);
+        toast({
+            title: 'Error al Revertir',
+            description: error.message || 'Ocurrió un error. Inténtalo de nuevo.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsRevertingPayment(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Validación de Datos</h1>
       </div>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Revertir Pago</CardTitle>
+          <CardDescription>
+            Si un pago se registró por error, puedes revertirlo aquí. Esto eliminará el registro del pago y devolverá la(s) cuota(s) asociadas a un estado pendiente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-4">
+            <div className="grid w-full max-w-sm items-center gap-1.5">
+                <Label htmlFor="paymentIdRevert">ID del Pago a Revertir</Label>
+                <Input id="paymentIdRevert" type="text" placeholder="Pega el ID del documento 'payments'" value={paymentIdToRevert} onChange={(e) => setPaymentIdToRevert(e.target.value)} />
+            </div>
+          <Button onClick={handleRevertPayment} disabled={isRevertingPayment} variant="destructive">
+            {isRevertingPayment ? (
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Undo2 className="mr-2 h-4 w-4" />
+            )}
+            {isRevertingPayment ? 'Revirtiendo...' : 'Revertir Pago'}
+          </Button>
+        </CardContent>
+      </Card>
       
        <Card>
         <CardHeader>
