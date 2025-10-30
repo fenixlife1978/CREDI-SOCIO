@@ -1,10 +1,10 @@
 'use client';
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Upload, Trash2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Upload, Trash2, Search } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { AddPartnerDialog } from "./add-partner-dialog";
+import { Input } from "@/components/ui/input";
 
 export default function PartnersPage() {
   const firestore = useFirestore();
@@ -23,6 +24,7 @@ export default function PartnersPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const partnersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -30,6 +32,20 @@ export default function PartnersPage() {
   }, [firestore]);
 
   const { data: partners, isLoading } = useCollection<Partner>(partnersQuery);
+  
+  const filteredPartners = useMemo(() => {
+    if (!partners) return [];
+    if (!searchTerm) return partners;
+
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return partners.filter(partner => 
+      partner.firstName.toLowerCase().includes(lowercasedTerm) ||
+      partner.lastName.toLowerCase().includes(lowercasedTerm) ||
+      (partner.identificationNumber && partner.identificationNumber.toLowerCase().includes(lowercasedTerm)) ||
+      (partner.alias && partner.alias.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [partners, searchTerm]);
+
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -199,8 +215,17 @@ export default function PartnersPage() {
           <CardHeader>
             <CardTitle>Gestionar Socios</CardTitle>
             <CardDescription>
-              Añade, edita y visualiza la información de los socios.
+              Busca, añade, edita y visualiza la información de los socios.
             </CardDescription>
+            <div className="relative pt-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, cédula, alias..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -225,7 +250,7 @@ export default function PartnersPage() {
                     </TableRow>
                   ))
                 )}
-                {!isLoading && partners?.map((partner) => (
+                {!isLoading && filteredPartners.map((partner) => (
                   <TableRow key={partner.id}>
                     <TableCell className="font-medium">{`${partner.firstName} ${partner.lastName}`}</TableCell>
                     <TableCell>{partner.identificationNumber}</TableCell>
@@ -254,10 +279,10 @@ export default function PartnersPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {!isLoading && partners?.length === 0 && (
+                {!isLoading && filteredPartners.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      No se encontraron socios.
+                      No se encontraron socios con los criterios de búsqueda.
                     </TableCell>
                   </TableRow>
                 )}
