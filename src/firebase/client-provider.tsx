@@ -4,6 +4,7 @@ import React, { type ReactNode, useEffect, useState, useMemo, createContext, use
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
 import { getAuth, onAuthStateChanged, signInAnonymously, type User, type Auth } from 'firebase/auth';
+import type { FirebaseStorage } from 'firebase/storage';
 
 const FirebaseLoadingContext = createContext<boolean>(true);
 
