@@ -3,14 +3,14 @@
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
-import type { Loan, Installment } from '@/lib/data';
+import { doc, collection, query, where, addDoc } from 'firebase/firestore';
+import type { Loan, Installment, Partner } from '@/lib/data';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy } from 'lucide-react';
+import { ArrowLeft, Copy, Receipt } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +72,12 @@ export default function LoanDetailPage() {
     [firestore, loanId]
   );
   const { data: loan, isLoading: loanLoading } = useDoc<Loan>(loanRef);
+  
+  const partnerRef = useMemoFirebase(() => 
+    (firestore && loan) ? doc(firestore, 'partners', loan.partnerId) : null,
+    [firestore, loan]
+  );
+  const { data: partner, isLoading: partnerLoading } = useDoc<Partner>(partnerRef);
 
   const installmentsQuery = useMemoFirebase(() =>
     (firestore && loanId) ? query(collection(firestore, 'installments'), where('loanId', '==', loanId)) : null,
@@ -104,11 +110,50 @@ export default function LoanDetailPage() {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copiado",
-      description: "El ID del pago ha sido copiado al portapapeles.",
+      description: "El ID ha sido copiado al portapapeles.",
     });
   };
 
-  const isLoading = loanLoading || installmentsLoading;
+  const handleGenerateGrantReceipt = async () => {
+    if (!firestore || !loan || !partner) {
+      toast({ title: "Error", description: "No se pueden cargar los datos para generar el recibo.", variant: "destructive"});
+      return;
+    }
+
+    try {
+      const receiptsRef = collection(firestore, 'receipts');
+      const newReceipt = {
+        type: 'loan_grant' as const,
+        partnerId: loan.partnerId,
+        loanId: loan.id,
+        generationDate: new Date().toISOString(),
+        amount: loan.totalAmount,
+        partnerName: partner.firstName + ' ' + partner.lastName,
+        partnerIdentification: partner.identificationNumber,
+        loanDetails: {
+          totalAmount: loan.totalAmount,
+          interestRate: loan.interestRate,
+          numberOfInstallments: loan.numberOfInstallments,
+          loanType: loan.loanType,
+        },
+      };
+
+      const docRef = await addDoc(receiptsRef, newReceipt);
+      
+      toast({
+        title: "Recibo Generado",
+        description: `Se generó el recibo de otorgamiento.`,
+      });
+
+      router.push(`/dashboard/receipts/${docRef.id}`);
+
+    } catch (error) {
+      console.error("Error generating receipt:", error);
+      toast({ title: "Error", description: "No se pudo generar el recibo.", variant: "destructive"});
+    }
+  };
+
+  const isLoading = loanLoading || installmentsLoading || partnerLoading;
   
   if (isLoading) {
     return <LoanDetailsSkeleton />;
@@ -134,6 +179,10 @@ export default function LoanDetailPage() {
                 <span className="sr-only">Volver</span>
             </Button>
             <h1 className="font-semibold text-lg md:text-2xl">Detalles del Préstamo</h1>
+            <Button size="sm" className="ml-auto" onClick={handleGenerateGrantReceipt}>
+                <Receipt className="mr-2 h-4 w-4" />
+                Generar Recibo de Otorgamiento
+            </Button>
         </div>
       
         <Card>
@@ -184,6 +233,7 @@ export default function LoanDetailPage() {
                                 <TableHead>Fecha de Vencimiento</TableHead>
                                 <TableHead>Estado</TableHead>
                                 <TableHead>ID de Pago</TableHead>
+                                <TableHead>Recibo</TableHead>
                                 <TableHead className="text-right">Capital</TableHead>
                                 <TableHead className="text-right">Interés</TableHead>
                                 <TableHead className="text-right">Monto Total</TableHead>
@@ -213,6 +263,15 @@ export default function LoanDetailPage() {
                                             '-'
                                         )}
                                     </TableCell>
+                                    <TableCell>
+                                        {installment.receiptId ? (
+                                             <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/receipts/${installment.receiptId}`)}>
+                                                Ver Recibo
+                                             </Button>
+                                        ) : (
+                                            '-'
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
                                     <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
                                     <TableCell className="text-right font-semibold">{currencyFormatter.format(installment.totalAmount)}</TableCell>
@@ -220,7 +279,7 @@ export default function LoanDetailPage() {
                             ))}
                             {sortedInstallments.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                         Este préstamo no tiene un plan de cuotas definido.
                                     </TableCell>
                                 </TableRow>

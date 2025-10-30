@@ -42,7 +42,7 @@ export type Payment = {
 };
 
 export type Installment = {
-  id: string; // Document ID from Firestore
+  id:string; // Document ID from Firestore
   loanId: string;
   partnerId: string;
   installmentNumber: number;
@@ -53,7 +53,36 @@ export type Installment = {
   interestAmount: number;
   totalAmount: number;
   paymentId?: string; // Reference to the payment document
+  receiptId?: string;
 }
+
+export type Receipt = {
+    id: string;
+    type: 'loan_grant' | 'installment_payment';
+    partnerId: string;
+    loanId: string;
+    paymentId?: string;
+    installmentId?: string;
+    generationDate: string; // ISO
+    amount: number;
+    // For display
+    partnerName?: string;
+    partnerIdentification?: string;
+    // For loan grant
+    loanDetails?: {
+      totalAmount: number;
+      interestRate: number;
+      numberOfInstallments: number;
+      loanType: string;
+    };
+    // For installment payment
+    installmentDetails?: {
+      installmentNumber: number;
+      capitalAmount: number;
+      interestAmount: number;
+    };
+};
+
 
 export type CompanyProfile = {
   companyName: string;
@@ -61,5 +90,4 @@ export type CompanyProfile = {
   phone: string;
   email: string;
   rif: string;
-  logoUrl?: string; // Make logoUrl optional as it's no longer managed here
 };

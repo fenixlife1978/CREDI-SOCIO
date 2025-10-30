@@ -225,7 +225,7 @@ export default function RegisterPaymentPage() {
   };
 
   const handleProcessPayments = async () => {
-    if (!firestore || !installments) return;
+    if (!firestore || !installments || !partners) return;
     
     const installmentIdsToProcess = Object.entries(selectedInstallments)
       .filter(([, isSelected]) => isSelected)
@@ -250,6 +250,7 @@ export default function RegisterPaymentPage() {
       const loanStatusCheck: Record<string, boolean> = {};
 
       for (const inst of installmentsToUpdate) {
+        const partner = partners.find(p => p.id === inst.partnerId);
         const originalDueDate = parseISO(inst.dueDate);
         const paymentDate = set(originalDueDate, {
             month: selectedMonth,
@@ -275,12 +276,31 @@ export default function RegisterPaymentPage() {
         paymentsByLoan[inst.loanId].totalAmount += inst.totalAmount;
         paymentsByLoan[inst.loanId].capitalAmount += inst.capitalAmount;
         paymentsByLoan[inst.loanId].interestAmount += inst.interestAmount;
+        
+        const receiptRef = doc(collection(firestore, 'receipts'));
+        batch.set(receiptRef, {
+            type: 'installment_payment',
+            partnerId: inst.partnerId,
+            loanId: inst.loanId,
+            paymentId: paymentsByLoan[inst.loanId].ref.id,
+            installmentId: inst.id,
+            generationDate: new Date().toISOString(),
+            amount: inst.totalAmount,
+            partnerName: partner ? `${partner.firstName} ${partner.lastName}` : inst.partnerId,
+            partnerIdentification: partner?.identificationNumber || '',
+            installmentDetails: {
+                installmentNumber: inst.installmentNumber,
+                capitalAmount: inst.capitalAmount,
+                interestAmount: inst.interestAmount,
+            },
+        });
 
         const installmentRef = doc(firestore, 'installments', inst.id);
         batch.update(installmentRef, { 
             status: 'paid', 
             paymentDate, 
-            paymentId: paymentsByLoan[inst.loanId].ref.id 
+            paymentId: paymentsByLoan[inst.loanId].ref.id,
+            receiptId: receiptRef.id,
         });
 
         loanStatusCheck[inst.loanId] = true;
@@ -311,7 +331,7 @@ export default function RegisterPaymentPage() {
 
       toast({
         title: "¡Pagos Procesados!",
-        description: `${installmentsToUpdate.length} cuota(s) han sido marcadas como pagadas.`,
+        description: `${installmentsToUpdate.length} cuota(s) han sido marcadas como pagadas y sus recibos generados.`,
       });
       setSelectedInstallments({}); // Clear selection
     } catch (error) {

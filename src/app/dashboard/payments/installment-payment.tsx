@@ -16,6 +16,7 @@ import {
   writeBatch,
   doc,
   getDocs,
+  addDoc,
 } from 'firebase/firestore';
 import type { Partner, Loan, Installment } from '@/lib/data';
 
@@ -153,7 +154,7 @@ export default function InstallmentPayment() {
   });
 
   const onSubmit = async (data: PaymentFormData) => {
-    if (!firestore || !loanInstallments) return;
+    if (!firestore || !loanInstallments || !partners) return;
 
     const installmentsToPay = loanInstallments.filter(inst => data.selectedInstallmentIds.includes(inst.id));
 
@@ -185,13 +186,35 @@ export default function InstallmentPayment() {
         type: 'installment_payment'
       });
 
-      // 2. Update status of each paid installment
+      // 2. Update status of each paid installment and create receipts
       for (const inst of installmentsToPay) {
         const installmentRef = doc(firestore, 'installments', inst.id);
+        const receiptRef = doc(collection(firestore, 'receipts'));
+
+        // Create receipt
+        batch.set(receiptRef, {
+            type: 'installment_payment',
+            partnerId: inst.partnerId,
+            loanId: inst.loanId,
+            paymentId: paymentRef.id,
+            installmentId: inst.id,
+            generationDate: new Date().toISOString(),
+            amount: inst.totalAmount,
+            partnerName: partner ? `${partner.firstName} ${partner.lastName}` : data.partnerId,
+            partnerIdentification: partner?.identificationNumber || '',
+            installmentDetails: {
+                installmentNumber: inst.installmentNumber,
+                capitalAmount: inst.capitalAmount,
+                interestAmount: inst.interestAmount,
+            },
+        });
+
+        // Update installment
         batch.update(installmentRef, { 
             status: 'paid', 
             paymentDate: new Date(data.paymentDate).toISOString(),
-            paymentId: paymentRef.id // Add payment ID to installment
+            paymentId: paymentRef.id,
+            receiptId: receiptRef.id,
         });
       }
 
@@ -213,7 +236,7 @@ export default function InstallmentPayment() {
 
       toast({
         title: '¡Pago Registrado!',
-        description: `Se registró un pago de ${currencyFormatter.format(totalAmount)} cubriendo ${installmentsToPay.length} cuota(s).`,
+        description: `Se registró un pago de ${currencyFormatter.format(totalAmount)} cubriendo ${installmentsToPay.length} cuota(s) y se generaron los recibos.`,
       });
       
       form.reset({
@@ -347,7 +370,7 @@ export default function InstallmentPayment() {
                                       />
                                     </TableCell>
                                     <TableCell>{installment.installmentNumber}</TableCell>
-                                    <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yy')}</TableCell>
                                     <TableCell>
                                     <Badge variant={installment.status === 'overdue' ? 'destructive' : 'outline'}>
                                         {installment.status}
