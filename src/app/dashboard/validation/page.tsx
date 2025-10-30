@@ -260,7 +260,7 @@ export default function ValidationPage() {
   };
 
   const handleRevertPayment = async () => {
-    // Sanitize the input to remove whitespace and any non-alphanumeric characters
+    // Sanitize the input to remove any character that is not a letter or a number.
     const sanitizedId = paymentIdToRevert.replace(/[^a-zA-Z0-9]/g, '');
 
     if (!firestore || !sanitizedId) {
@@ -282,31 +282,39 @@ export default function ValidationPage() {
             const paymentData = paymentDoc.data() as Payment;
             const { installmentIds, loanId } = paymentData;
 
-            // 1. Delete the payment document
-            transaction.delete(paymentRef);
+            // --- ALL READS MUST BE FIRST ---
 
-            // 2. Revert installment status
-            for (const installmentId of installmentIds) {
-                const installmentRef = doc(firestore, 'installments', installmentId);
-                const installmentDoc = await transaction.get(installmentRef);
-                 if (installmentDoc.exists()) {
-                    const installmentData = installmentDoc.data() as Installment;
-                    // Revert status to 'pending' or 'overdue' based on due date
-                    const dueDate = new Date(installmentData.dueDate);
-                    const newStatus = isBefore(dueDate, startOfToday()) ? 'overdue' : 'pending';
-                    transaction.update(installmentRef, { status: newStatus, paymentDate: null });
-                }
-            }
+            // Read all associated installments first
+            const installmentDocs = await Promise.all(
+                installmentIds.map(id => transaction.get(doc(firestore, 'installments', id)))
+            );
 
-            // 3. Revert loan status if it was 'Finalizado'
+            // Read the loan document
+            let loanDoc: any = null;
             if (loanId) {
                 const loanRef = doc(firestore, 'loans', loanId);
-                const loanDoc = await transaction.get(loanRef);
-                if (loanDoc.exists() && loanDoc.data().status === 'Finalizado') {
-                    // A simple status change. A more complex app might need to check if other installments are still pending.
-                    transaction.update(loanRef, { status: 'Active' });
+                loanDoc = await transaction.get(loanRef);
+            }
+
+            // --- ALL WRITES MUST BE AFTER READS ---
+
+            // 1. Revert installment status
+            for (const installmentDoc of installmentDocs) {
+                if (installmentDoc.exists()) {
+                    const installmentData = installmentDoc.data() as Installment;
+                    const dueDate = new Date(installmentData.dueDate);
+                    const newStatus = isBefore(dueDate, startOfToday()) ? 'overdue' : 'pending';
+                    transaction.update(installmentDoc.ref, { status: newStatus, paymentDate: null });
                 }
             }
+
+            // 2. Revert loan status if it was 'Finalizado'
+            if (loanDoc && loanDoc.exists() && loanDoc.data().status === 'Finalizado') {
+                transaction.update(loanDoc.ref, { status: 'Active' });
+            }
+
+            // 3. Delete the payment document
+            transaction.delete(paymentRef);
         });
 
         toast({
