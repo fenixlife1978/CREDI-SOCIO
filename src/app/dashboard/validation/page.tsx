@@ -260,9 +260,11 @@ export default function ValidationPage() {
   };
 
   const handleRevertPayment = async () => {
-    const trimmedId = paymentIdToRevert.trim();
-    if (!firestore || !trimmedId) {
-      toast({ title: 'Error', description: 'Por favor, proporciona el ID del pago a revertir.', variant: 'destructive' });
+    // Sanitize the input to remove whitespace and any non-alphanumeric characters
+    const sanitizedId = paymentIdToRevert.replace(/[^a-zA-Z0-9]/g, '');
+
+    if (!firestore || !sanitizedId) {
+      toast({ title: 'Error', description: 'Por favor, proporciona un ID de pago válido.', variant: 'destructive' });
       return;
     }
 
@@ -270,11 +272,11 @@ export default function ValidationPage() {
 
     try {
         await runTransaction(firestore, async (transaction) => {
-            const paymentRef = doc(firestore, 'payments', trimmedId);
+            const paymentRef = doc(firestore, 'payments', sanitizedId);
             const paymentDoc = await transaction.get(paymentRef);
 
             if (!paymentDoc.exists()) {
-                throw new Error(`El pago con ID ${trimmedId} no fue encontrado.`);
+                throw new Error(`El pago con ID ${sanitizedId} no fue encontrado.`);
             }
 
             const paymentData = paymentDoc.data() as Payment;
@@ -309,7 +311,7 @@ export default function ValidationPage() {
 
         toast({
             title: '¡Pago Revertido!',
-            description: `El pago ${trimmedId} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
+            description: `El pago ${sanitizedId} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
         });
         setPaymentIdToRevert('');
 
