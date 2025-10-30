@@ -32,6 +32,7 @@ const navItems = [
   { href: '/dashboard/payments', label: 'Pagos', icon: DollarSign },
   { href: '/dashboard/reports', label: 'Reportes', icon: FileText },
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldCheck },
+  { href: '/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
 
 function CrediManageLogo() {

@@ -277,6 +277,38 @@
         "reportType",
         "generatedDate"
       ]
+    },
+    "CompanyProfile": {
+      "title": "Company Profile",
+      "type": "object",
+      "description": "Stores company information and settings.",
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "description": "The name of the company."
+        },
+        "address": {
+          "type": "string",
+          "description": "The company's physical address."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The company's contact phone number."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The company's contact email."
+        },
+        "rif": {
+          "type": "string",
+          "description": "The company's tax identification number (RIF)."
+        },
+        "logoUrl": {
+          "type": "string",
+          "description": "URL of the company's logo."
+        }
+      }
     }
   },
   "auth": {
@@ -320,6 +352,13 @@
         "$ref": "#/entities/Report"
       },
       "description": "Stores generated financial report data."
+    },
+    "/settings/companyProfile": {
+      "schema": {
+        "$ref": "#/entities/CompanyProfile"
+      },
+      "description": "Stores a single document with the company's profile information."
     }
   }
 }
+
