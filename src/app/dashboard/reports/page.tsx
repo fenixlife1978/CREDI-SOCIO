@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import type { Payment, Installment } from '@/lib/data';
+import type { Payment, Installment, Partner } from '@/lib/data';
 import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const months = Array.from({ length: 12 }, (_, i) => ({
   value: i,
@@ -48,6 +50,122 @@ function ReportSkeleton() {
         </Card>
     )
 }
+
+function PaidPaymentsTab() {
+  const firestore = useFirestore();
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const paymentsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'payments')) : null),
+    [firestore]
+  );
+  const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
+
+  const { filteredPayments, totalPaid, totalCapital, totalInterest } = useMemo(() => {
+    if (!payments) return { filteredPayments: [], totalPaid: 0, totalCapital: 0, totalInterest: 0 };
+    
+    const filtered = payments.filter(p => {
+      const paymentDate = parseISO(p.paymentDate);
+      return getMonth(paymentDate) === selectedMonth && getYear(paymentDate) === selectedYear;
+    });
+
+    const totals = filtered.reduce((acc, p) => {
+      acc.totalPaid += p.totalAmount;
+      acc.totalCapital += p.capitalAmount;
+      acc.totalInterest += p.interestAmount;
+      return acc;
+    }, { totalPaid: 0, totalCapital: 0, totalInterest: 0 });
+
+    return { 
+      filteredPayments: filtered.sort((a,b) => parseISO(a.paymentDate).getTime() - parseISO(b.paymentDate).getTime()), 
+      totalPaid: totals.totalPaid,
+      totalCapital: totals.totalCapital,
+      totalInterest: totals.totalInterest,
+    };
+  }, [payments, selectedMonth, selectedYear]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Reporte de Pagos Realizados</CardTitle>
+        <CardDescription>Filtra los pagos por mes y año.</CardDescription>
+        <div className="flex gap-2 pt-4">
+          <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Selecciona un mes" />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map(month => (
+                <SelectItem key={month.value} value={String(month.value)}>
+                  <span className="capitalize">{month.label}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Selecciona un año" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map(year => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <ReportSkeleton /> :
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Socio</TableHead>
+              <TableHead>Fecha de Pago</TableHead>
+              <TableHead className="text-right">Capital Pagado</TableHead>
+              <TableHead className="text-right">Interés Pagado</TableHead>
+              <TableHead className="text-right">Monto Total Pagado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredPayments.map((payment) => (
+              <TableRow key={payment.id}>
+                <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
+                <TableCell>{format(parseISO(payment.paymentDate), 'dd/MM/yyyy')}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(payment.capitalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(payment.interestAmount)}</TableCell>
+                <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
+              </TableRow>
+            ))}
+            {filteredPayments.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  No hay pagos para este período.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>}
+      </CardContent>
+      {!isLoading && filteredPayments.length > 0 && (
+        <CardFooter className="flex-col items-end gap-2">
+            <div className="text-lg font-semibold">
+                Total Capital Pagado: {currencyFormatter.format(totalCapital)}
+            </div>
+             <div className="text-lg font-semibold">
+                Total Interés Pagado: {currencyFormatter.format(totalInterest)}
+            </div>
+            <div className="text-xl font-bold">
+                Total General Pagado: {currencyFormatter.format(totalPaid)}
+            </div>
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
 
 function UnpaidInstallmentsTab() {
   const firestore = useFirestore();
@@ -86,7 +204,7 @@ function UnpaidInstallmentsTab() {
 
   // Need partner names
   const partnersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'partners') : null), [firestore]);
-  const { data: partners } = useCollection(partnersQuery);
+  const { data: partners } = useCollection<Partner>(partnersQuery);
   const partnersMap = useMemo(() => {
     if (!partners) return new Map();
     return new Map(partners.map((p: any) => [p.id, `${p.firstName} ${p.lastName}`]));
@@ -187,7 +305,19 @@ export default function ReportsPage() {
        <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Reportes</h1>
       </div>
-      <UnpaidInstallmentsTab />
+      <Tabs defaultValue="paid">
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="paid">Cuotas Pagadas</TabsTrigger>
+            <TabsTrigger value="unpaid">Cuotas No Pagadas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="paid">
+            <PaidPaymentsTab />
+        </TabsContent>
+        <TabsContent value="unpaid">
+            <UnpaidInstallmentsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
+
