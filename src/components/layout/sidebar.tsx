@@ -40,7 +40,7 @@ function AppLogo() {
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
        <Image 
-        src="https://www.shutterstock.com/image-vector/bus-logo-transportation-company-tour-600nw-2311818205.jpg" 
+        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s" 
         alt="Logo"
         width={40}
         height={40}

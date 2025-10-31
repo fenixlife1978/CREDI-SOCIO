@@ -58,7 +58,7 @@ export default function LockPage() {
                     className="rounded-full"
                 />
             </div>
-          <CardTitle>Acceso Restringido</CardTitle>
+          <CardTitle>COOP. LA CANDELARIA</CardTitle>
           <CardDescription>
             Introduce el código PIN de 4 dígitos para desbloquear.
           </CardDescription>

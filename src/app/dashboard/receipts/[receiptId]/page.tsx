@@ -103,7 +103,7 @@ export default function ReceiptPage() {
                 <CardHeader className="text-center">
                     <div className="flex justify-center items-center gap-4 mb-2">
                         <Image 
-                            src="https://www.shutterstock.com/image-vector/bus-logo-transportation-company-tour-600nw-2311818205.jpg"
+                            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s"
                             alt="Logo"
                             width={60}
                             height={60}
