@@ -6,9 +6,9 @@ import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestor
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt } from 'lucide-react';
+import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt, CalendarCheck } from 'lucide-react';
 import type { Installment, Payment, Loan, Partner } from '@/lib/data';
-import { isBefore, startOfToday, parse } from 'date-fns';
+import { isBefore, startOfToday, parse, isValid } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +37,7 @@ export default function ValidationPage() {
   const [isGeneratingReceipts, setIsGeneratingReceipts] = useState(false);
   const [isUpdatingPaymentDate, setIsUpdatingPaymentDate] = useState(false);
   const [isRevertingPayment, setIsRevertingPayment] = useState(false);
+  const [isFixingInstallmentDates, setIsFixingInstallmentDates] = useState(false);
   const [fixLogs, setFixLogs] = useState<string[]>([]);
   const [paymentIdToUpdate, setPaymentIdToUpdate] = useState('');
   const [installmentIdToUpdate, setInstallmentIdToUpdate] = useState('');
@@ -414,6 +415,67 @@ export default function ValidationPage() {
     }
   };
 
+  const handleFixInstallmentDates = async () => {
+    if (!firestore) return;
+    setIsFixingInstallmentDates(true);
+    setFixLogs([]);
+    const logs: string[] = [];
+    let correctedCount = 0;
+
+    try {
+      const installmentsQuery = query(collection(firestore, 'installments'), where('status', '==', 'paid'));
+      const querySnapshot = await getDocs(installmentsQuery);
+      const batch = writeBatch(firestore);
+
+      for (const document of querySnapshot.docs) {
+        const installment = document.data() as Installment;
+        const installmentId = document.id;
+
+        if (installment.paymentDate && typeof installment.paymentDate === 'string' && !installment.paymentDate.includes('T')) {
+          try {
+            const parsedDate = parse(installment.paymentDate, 'dd/MM/yyyy', new Date());
+            if (isValid(parsedDate)) {
+              const newPaymentDateISO = parsedDate.toISOString();
+              const installmentRef = doc(firestore, 'installments', installmentId);
+              batch.update(installmentRef, { paymentDate: newPaymentDateISO });
+              logs.push(`ID Cuota: ${installmentId} | Fecha Corregida: ${installment.paymentDate} -> ${newPaymentDateISO}`);
+              correctedCount++;
+            } else {
+              logs.push(`ID Cuota: ${installmentId} | OMITIDO: Formato de fecha '${installment.paymentDate}' no es válido.`);
+            }
+          } catch (e) {
+            logs.push(`ID Cuota: ${installmentId} | OMITIDO: Error procesando fecha '${installment.paymentDate}'.`);
+          }
+        }
+      }
+
+      if (correctedCount > 0) {
+        await batch.commit();
+        toast({
+          title: 'Fechas Corregidas',
+          description: `Se corrigieron las fechas de ${correctedCount} cuotas pagadas. Los reportes ahora se mostrarán correctamente.`,
+        });
+      } else {
+        toast({
+          title: 'Sin Cambios',
+          description: 'No se encontraron cuotas pagadas con formatos de fecha antiguos para corregir.',
+        });
+      }
+
+      setFixLogs(logs.length > 0 ? logs : ["No se encontraron logs para mostrar."]);
+
+    } catch (error: any) {
+      console.error('Error fixing installment dates:', error);
+      toast({
+        title: 'Error de Corrección',
+        description: error.message || 'Ocurrió un error al intentar corregir las fechas de las cuotas.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsFixingInstallmentDates(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -513,12 +575,38 @@ export default function ValidationPage() {
         </CardContent>
       </Card>
 
+        <Card>
+            <CardHeader>
+                <CardTitle>Corregir Fechas de Pago en Cuotas</CardTitle>
+                <CardDescription>
+                Esta herramienta busca cuotas pagadas cuya fecha de pago (`paymentDate`) esté en un formato de texto no estándar (ej. DD/MM/YYYY) y la convierte al formato ISO requerido por los reportes. Ejecuta esto si los reportes no muestran pagos antiguos.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-start gap-4">
+                <Button onClick={handleFixInstallmentDates} disabled={isFixingInstallmentDates}>
+                    {isFixingInstallmentDates ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <CalendarCheck className="mr-2 h-4 w-4" />}
+                    {isFixingInstallmentDates ? 'Corrigiendo...' : 'Corregir Fechas de Cuotas'}
+                </Button>
+                 {fixLogs.length > 0 && isFixingInstallmentDates === false && (
+                    <div className="w-full mt-4">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2"><FileText className="h-4 w-4" />Log de Corrección:</h3>
+                        <ScrollArea className="h-60 w-full rounded-md border p-4 bg-muted/50">
+                            <pre className="text-xs whitespace-pre-wrap">
+                            {fixLogs.join('\n')}
+                            </pre>
+                        </ScrollArea>
+                    </div>
+                 )}
+            </CardContent>
+        </Card>
+
        <Card>
         <CardHeader>
-          <CardTitle>Corregir Pagos Históricos</CardTitle>
+          <CardTitle>Corregir Pagos Históricos (Desglose)</CardTitle>
           <CardDescription>
-            Busca pagos antiguos sin desglose de capital/interés y/o con formato de fecha antiguo (DD/MM/YYYY). 
-            Calcula el desglose (interés del 4.6%) y estandariza la fecha para asegurar que todos los reportes funcionen correctamente.
+            Busca pagos antiguos sin desglose de capital/interés. 
+            Calcula el desglose (interés del 4.6%) para asegurar que todos los reportes funcionen correctamente. 
+            Esta herramienta es menos relevante si los reportes ya funcionan bien.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-4">
@@ -528,9 +616,9 @@ export default function ValidationPage() {
             ) : (
               <Wrench className="mr-2 h-4 w-4" />
             )}
-            {isFixingPayments ? 'Corrigiendo Pagos...' : 'Iniciar Corrección'}
+            {isFixingPayments ? 'Corrigiendo Pagos...' : 'Iniciar Corrección de Desglose'}
           </Button>
-          {fixLogs.length > 0 && (
+          {fixLogs.length > 0 && isFixingPayments === false && (
             <div className="w-full mt-4">
               <h3 className="font-semibold mb-2 flex items-center gap-2"><FileText className="h-4 w-4" />Log de Corrección:</h3>
               <ScrollArea className="h-60 w-full rounded-md border p-4 bg-muted/50">
