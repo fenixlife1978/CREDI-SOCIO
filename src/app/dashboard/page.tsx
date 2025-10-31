@@ -65,13 +65,14 @@ export default function DashboardPage() {
   const { totalLent, totalInterest, paymentDue } = useMemo(() => {
     if (!loans) return { totalLent: 0, totalInterest: 0, paymentDue: 0 };
     return loans.reduce((acc, loan) => {
-        const interest = loan.totalAmount * (loan.interestRate / 100);
+        const interestRate = loan.interestRate || 0;
+        const interest = loan.totalAmount * (interestRate / 100);
         acc.totalLent += loan.totalAmount;
         if (loan.status === 'Finalizado') {
             acc.totalInterest += interest;
         }
-        if ((loan.status === 'Active' || loan.status === 'Overdue') && loan.numberOfInstallments > 0) {
-          const monthlyPayment = (loan.totalAmount * (1 + loan.interestRate / 100)) / loan.numberOfInstallments;
+        if ((loan.status === 'Active' || loan.status === 'Overdue') && loan.numberOfInstallments && loan.numberOfInstallments > 0) {
+          const monthlyPayment = (loan.totalAmount * (1 + interestRate / 100)) / loan.numberOfInstallments;
           acc.paymentDue += monthlyPayment;
         }
         return acc;
