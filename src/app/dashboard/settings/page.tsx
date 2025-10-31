@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useDoc, useFirestore } from '@/firebase';
+import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from 'lucide-react';
 import type { CompanyProfile } from '@/lib/data';
+import { useDoc } from '@/firebase';
 
 const settingsSchema = z.object({
   companyName: z.string().min(1, 'El nombre de la empresa es requerido.'),
@@ -59,22 +60,32 @@ export default function SettingsPage() {
 
   const onSubmit = async (data: SettingsFormData) => {
     setIsSubmitting(true);
-    try {
-      await setDoc(settingsDocRef, data, { merge: true });
-      toast({
-        title: '¡Guardado!',
-        description: 'La información de la empresa ha sido actualizada.',
+    
+    setDoc(settingsDocRef, data, { merge: true })
+      .then(() => {
+        toast({
+          title: '¡Guardado!',
+          description: 'La información de la empresa ha sido actualizada.',
+        });
+      })
+      .catch((serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: settingsDocRef.path,
+          operation: 'write',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        
+        // Show a generic error to the user in case the global handler fails
+        toast({
+            title: 'Error de Permiso',
+            description: 'No tienes permiso para guardar la configuración.',
+            variant: 'destructive',
+        });
+      })
+      .finally(() => {
+        setIsSubmitting(false);
       });
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo guardar la configuración.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   return (
