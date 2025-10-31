@@ -6,17 +6,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { DollarSign, Landmark, Users, CreditCard } from "lucide-react"
-import { OverviewChart } from "./overview-chart";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Landmark, Users, Eye } from "lucide-react"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
-import type { Installment, Partner, Loan } from "@/lib/data";
+import { collection, query, where, orderBy, limit } from "firebase/firestore";
+import type { Partner, Loan, Payment } from "@/lib/data";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { getMonth, getYear, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
-function StatCard({ title, value, icon, description, isLoading, className }: { title: string, value: string, icon: React.ReactNode, description?: string, isLoading: boolean, className?: string }) {
+
+function StatCard({ title, value, icon, isLoading, className }: { title: string, value: string, icon: React.ReactNode, isLoading: boolean, className?: string }) {
     return (
         <Card className={cn("rounded-2xl", className)}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -29,12 +34,10 @@ function StatCard({ title, value, icon, description, isLoading, className }: { t
               {isLoading ? (
                 <>
                   <Skeleton className="h-8 w-3/4 mb-2 bg-white/20" />
-                  <Skeleton className="h-4 w-1/2 bg-white/20" />
                 </>
               ) : (
                 <>
                   <div className="text-2xl font-bold">{value}</div>
-                  {description && <p className="text-xs text-white/80">{description}</p>}
                 </>
               )}
             </CardContent>
@@ -44,12 +47,7 @@ function StatCard({ title, value, icon, description, isLoading, className }: { t
 
 export default function DashboardPage() {
   const firestore = useFirestore();
-  
-  const paidInstallmentsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'installments'), where('status', '==', 'paid')) : null, 
-    [firestore]
-  );
-  const { data: paidInstallments, isLoading: installmentsLoading } = useCollection<Installment>(paidInstallmentsQuery);
+  const router = useRouter();
 
   const partnersQuery = useMemoFirebase(() =>
     firestore ? query(collection(firestore, 'partners')) : null,
@@ -63,27 +61,13 @@ export default function DashboardPage() {
   );
   const { data: activeLoans, isLoading: activeLoansLoading } = useCollection<Loan>(activeLoansQuery);
 
-  const { monthlyPayments, monthlyInterest } = useMemo(() => {
-    if (!paidInstallments) return { monthlyPayments: 0, monthlyInterest: 0 };
-    
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    return paidInstallments.reduce((acc, installment) => {
-        if (!installment.paymentDate) return acc;
-        try {
-            const paymentDate = parseISO(installment.paymentDate);
-            if (getMonth(paymentDate) === currentMonth && getYear(paymentDate) === currentYear) {
-                acc.monthlyPayments += installment.totalAmount;
-                acc.monthlyInterest += installment.interestAmount;
-            }
-        } catch(e) {
-            // Ignore invalid dates
-        }
-        return acc;
-    }, { monthlyPayments: 0, monthlyInterest: 0 });
-  }, [paidInstallments]);
+  const recentPaymentsQuery = useMemoFirebase(() =>
+    firestore 
+      ? query(collection(firestore, 'payments'), orderBy('paymentDate', 'desc'), limit(5)) 
+      : null,
+    [firestore]
+  );
+  const { data: recentPayments, isLoading: paymentsLoading } = useCollection<Payment>(recentPaymentsQuery);
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
@@ -92,7 +76,18 @@ export default function DashboardPage() {
     maximumFractionDigits: 0,
   });
 
-  const isLoading = installmentsLoading || partnersLoading || activeLoansLoading;
+  const getPaymentTypeLabel = (type: string | undefined) => {
+    switch (type) {
+        case 'installment_payment':
+            return 'Pago de Cuota';
+        case 'individual_contribution':
+            return 'Abono Individual';
+        default:
+            return 'Pago';
+    }
+  }
+
+  const isLoading = partnersLoading || activeLoansLoading || paymentsLoading;
 
   return (
     <div className="flex flex-col gap-6">
@@ -111,28 +106,67 @@ export default function DashboardPage() {
             isLoading={isLoading}
              className="bg-[#65C466] text-white"
         />
-        <StatCard 
-            title="Pagos Recibidos (Mes Actual)"
-            value={currencyFormatter.format(monthlyPayments)}
-            icon={<CreditCard className="h-5 w-5" />}
-            isLoading={isLoading}
-             className="bg-[#FE5D56] text-white"
-        />
-        <StatCard 
-            title="Intereses Ganados (Mes Actual)"
-            value={currencyFormatter.format(monthlyInterest)}
-            icon={<DollarSign className="h-5 w-5" />}
-            isLoading={isLoading}
-            className="bg-[#FDC27A] text-white"
-        />
       </div>
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle>Visión General</CardTitle>
-          <CardDescription>Pagos recibidos vs. intereses ganados en el mes actual.</CardDescription>
+          <CardTitle>Últimos Pagos Recibidos</CardTitle>
+          <CardDescription>Aquí se muestran las transacciones de pago más recientes.</CardDescription>
         </CardHeader>
-        <CardContent className="pl-2">
-          {isLoading ? <Skeleton className="h-[350px] w-full" /> : <OverviewChart />}
+        <CardContent>
+          <div className="relative w-full overflow-auto">
+            <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Socio</TableHead>
+                    <TableHead>Fecha de Pago</TableHead>
+                    <TableHead>Tipo de Pago</TableHead>
+                    <TableHead className="text-right">Monto Total</TableHead>
+                    <TableHead className="w-[100px] text-center">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-28 rounded-full" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                      <TableCell className="text-center"><Skeleton className="h-8 w-8 mx-auto" /></TableCell>
+                    </TableRow>
+                  ))}
+                  {!isLoading && recentPayments && recentPayments.length > 0 ? (
+                    recentPayments.map(payment => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="font-medium">{payment.partnerName}</TableCell>
+                        <TableCell>{format(parseISO(payment.paymentDate), "d 'de' LLLL, yyyy", { locale: es })}</TableCell>
+                        <TableCell>
+                          <Badge variant={payment.type === 'individual_contribution' ? 'secondary' : 'default'}>
+                            {getPaymentTypeLabel(payment.type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
+                        <TableCell className="text-center">
+                           {payment.installmentIds && payment.installmentIds.length > 0 && (
+                            <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/loans/${payment.loanId}`)}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver Préstamo</span>
+                            </Button>
+                           )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    !isLoading && (
+                        <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center">
+                                No se han registrado pagos recientemente.
+                            </TableCell>
+                        </TableRow>
+                    )
+                  )}
+                </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
