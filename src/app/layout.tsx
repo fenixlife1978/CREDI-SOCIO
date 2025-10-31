@@ -4,8 +4,8 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/lib/auth-provider';
 
 export const metadata: Metadata = {
-  title: 'CrediManage',
-  description: 'Loan Management System',
+  title: 'Asociación Cooperativa de Transporte La Candelaria R.L.',
+  description: 'Sistema de Gestión de Préstamos',
 };
 
 export default function RootLayout({

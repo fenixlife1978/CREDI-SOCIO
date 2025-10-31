@@ -101,16 +101,19 @@ export default function ReceiptPage() {
         <div ref={printRef} className="p-2">
             <Card className="w-full max-w-2xl mx-auto shadow-none border-gray-300 print:shadow-none print:border-none">
                 <CardHeader className="text-center">
-                    <div className="flex justify-center items-center gap-4 mb-4">
+                    <div className="flex justify-center items-center gap-4 mb-2">
                         <Image 
-                            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s"
+                            src="https://www.shutterstock.com/image-vector/bus-logo-transportation-company-tour-600nw-2311818205.jpg"
                             alt="Logo"
                             width={60}
                             height={60}
                             className="rounded-md"
                         />
-                        <CardTitle className="text-2xl">Recibo de Pago</CardTitle>
+                         <div>
+                            <CardTitle className="text-xl">ASOCIACION COOPERATIVA DE TRANSPORTE LA CANDELARIA R.L.</CardTitle>
+                        </div>
                     </div>
+                    <p className="text-2xl font-bold">Recibo de Pago</p>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <Separator />

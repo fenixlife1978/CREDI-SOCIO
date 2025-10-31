@@ -40,13 +40,13 @@ function AppLogo() {
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
        <Image 
-        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s" 
+        src="https://www.shutterstock.com/image-vector/bus-logo-transportation-company-tour-600nw-2311818205.jpg" 
         alt="Logo"
         width={40}
         height={40}
         className="rounded-md"
         />
-      <span className="group-data-[collapsible=icon]:hidden">LOAN MANAGER</span>
+      <span className="group-data-[collapsible=icon]:hidden">COOP. LA CANDELARIA</span>
     </div>
   );
 }
