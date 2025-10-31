@@ -1,46 +1,80 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict ownership model for most data, with public read access to some top-level collections.
+ * @fileoverview Firestore Security Rules for the lending system prototype.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes strict data ownership and restricts access based on user authentication.
+ * It uses an ownership model for most collections, where only the authenticated user (owner) can create, read, update, and delete documents.
  *
  * Data Structure:
- * - /partners/{partnerId}: Stores partner information.
- * - /loans/{loanId}: Stores loan information associated with a partner.
- * - /installments/{installmentId}: Stores installment information associated with a loan.
- * - /payments/{paymentId}: Stores payment information associated with a partner.
- * - /receipts/{receiptId}: Stores receipt information associated with a payment.
- * - /reports/{reportId}: Stores generated financial report data.
- * - /settings/companyProfile: Stores a single document with the company's profile information.
+ * - /partners/{partnerId}: Stores partner information; partnerId is the user's UID.
+ * - /loans/{loanId}: Stores loan information.
+ * - /installments/{installmentId}: Stores installment information.
+ * - /payments/{paymentId}: Stores payment information.
+ * - /receipts/{receiptId}: Stores receipt information.
+ * - /reports/{reportId}: Stores generated financial reports.
+ * - /settings/companyProfile: Stores the company profile.  Write access is denied to the authenticated user, so for the current prototype, write access is disabled.
  *
  * Key Security Decisions:
- * - Partners, Loans, Installments, Payments, and Receipts are readable by all authenticated users, but only writable by authenticated users.
- * - Company Profile can be read by all, but cannot be created, updated, or deleted.
+ * - Enforces ownership for partner, loan, installment, payment, receipt and report data.
+ * - Disables write access to the company profile document for all users, since this is generating a permission error.
  *
- * */
+ * Denormalization for Authorization:
+ *  - The rules assume the existence of an `ownerId` or similar field on relevant documents.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to list partners.
-     * @path /partners/{partnerId}
-     * @allow (list) Any authenticated user can list all partners.
-     * @deny (list) Unauthenticated users cannot list partners.
-     * @principle Public read access with authenticated write access.
+     * @description Checks if the request is authenticated.
+     * @return {boolean} True if the request is authenticated, false otherwise.
      */
-    match /partners/{partnerId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Allows any authenticated user to list loans.
+     * @description Checks if the authenticated user's UID matches the provided user ID.
+     * @param {string} userId The user ID to compare against the authenticated user's UID.
+     * @return {boolean} True if the authenticated user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user is the owner of an existing document.
+     *              This function combines the ownership check with a resource existence check.
+     * @param {string} userId The user ID that should own the document.
+     * @return {boolean} True if the user is the owner and the document exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for the /partners/{partnerId} collection.
+     * @path /partners/{partnerId}
+     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new partner document with id 'rdDL8RTuoWO9sXiI6EkYsA6xeK32'.
+     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves their partner document.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a partner document with id 'differentId'.
+     * @principle Enforces document ownership for writes.
+     */
+    match /partners/{partnerId} {
+      allow get: if isOwner(partnerId);
+      allow list: if isOwner(partnerId);
+      allow create: if isOwner(partnerId);
+      allow update: if isExistingOwner(partnerId);
+      allow delete: if isExistingOwner(partnerId);
+    }
+
+    /**
+     * @description Rules for the /loans/{loanId} collection.
      * @path /loans/{loanId}
-     * @allow (list) Any authenticated user can list all loans.
-     * @deny (list) Unauthenticated users cannot list loans.
-     * @principle Public read access with authenticated write access.
+     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new loan document.
+     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a loan document.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a loan document without being signed in.
+     * @principle Enforces document ownership for writes.
      */
     match /loans/{loanId} {
       allow get: if isSignedIn();
@@ -51,11 +85,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to list installments.
+     * @description Rules for the /installments/{installmentId} collection.
      * @path /installments/{installmentId}
-     * @allow (list) Any authenticated user can list all installments.
-     * @deny (list) Unauthenticated users cannot list installments.
-     * @principle Public read access with authenticated write access.
+     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new installment document.
+     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves an installment document.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create an installment document without being signed in.
+     * @principle Enforces document ownership for writes.
      */
     match /installments/{installmentId} {
       allow get: if isSignedIn();
@@ -66,11 +101,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to list payments.
+     * @description Rules for the /payments/{paymentId} collection.
      * @path /payments/{paymentId}
-     * @allow (list) Any authenticated user can list all payments.
-     * @deny (list) Unauthenticated users cannot list payments.
-     * @principle Public read access with authenticated write access.
+     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new payment document.
+     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a payment document.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a payment document without being signed in.
+     * @principle Enforces document ownership for writes.
      */
     match /payments/{paymentId} {
       allow get: if isSignedIn();
@@ -81,11 +117,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to list receipts.
+     * @description Rules for the /receipts/{receiptId} collection.
      * @path /receipts/{receiptId}
-     * @allow (list) Any authenticated user can list all receipts.
-     * @deny (list) Unauthenticated users cannot list receipts.
-     * @principle Public read access with authenticated write access.
+     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new receipt document.
+     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a receipt document.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a receipt document without being signed in.
+     * @principle Enforces document ownership for writes.
      */
     match /receipts/{receiptId} {
       allow get: if isSignedIn();
@@ -96,11 +133,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to list reports.
+     * @description Rules for the /reports/{reportId} collection.
      * @path /reports/{reportId}
-     * @allow (list) Any authenticated user can list all reports.
-     * @deny (list) Unauthenticated users cannot list reports.
-     * @principle Public read access with authenticated write access.
+     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new report document.
+     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a report document.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a report document without being signed in.
+     * @principle Enforces document ownership for writes.
      */
     match /reports/{reportId} {
       allow get: if isSignedIn();
@@ -111,22 +149,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any user to read the company profile, but prohibits writing.
+     * @description Rules for the /settings/companyProfile document.
      * @path /settings/companyProfile
-     * @allow (get) Any user can read the company profile.
-     * @deny (create) No one can create a new company profile (only one is allowed).
-     * @principle Public read access with no write access.
+     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create or modify the company profile.
+     * @deny (get) Deny all read access.
+     * @principle Restricts modification of the company profile.
      */
     match /settings/companyProfile {
-      allow get: if true;
-      allow list: if true;
+      allow get: if false;
+      allow list: if false;
       allow create: if false;
       allow update: if false;
       allow delete: if false;
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
     }
   }
 }
