@@ -1,17 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestore, getDoc, runTransaction, addDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt, CalendarCheck } from 'lucide-react';
+import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt, CalendarCheck, RotateCcw } from 'lucide-react';
 import type { Installment, Payment, Loan, Partner } from '@/lib/data';
-import { isBefore, startOfToday, parse, isValid } from 'date-fns';
+import { isBefore, startOfToday, parse, isValid, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { es } from 'date-fns/locale';
+import { format } from 'date-fns';
 
 async function updateDocumentAndHandleError(db: Firestore, docRef: any, updateData: any) {
     try {
@@ -28,11 +31,18 @@ async function updateDocumentAndHandleError(db: Firestore, docRef: any, updateDa
     }
 }
 
+const months = Array.from({ length: 12 }, (_, i) => ({
+  value: i,
+  label: format(new Date(2000, i), 'LLLL', { locale: es }),
+}));
+const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
+
 
 export default function ValidationPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isProcessingOverdue, setIsProcessingOverdue] = useState(false);
+  const [isRevertingOverdue, setIsRevertingOverdue] = useState(false);
   const [isFixingPayments, setIsFixingPayments] = useState(false);
   const [isGeneratingReceipts, setIsGeneratingReceipts] = useState(false);
   const [isUpdatingPaymentDate, setIsUpdatingPaymentDate] = useState(false);
@@ -43,6 +53,13 @@ export default function ValidationPage() {
   const [installmentIdToUpdate, setInstallmentIdToUpdate] = useState('');
   const [newPaymentDate, setNewPaymentDate] = useState('');
   const [paymentIdToRevert, setPaymentIdToRevert] = useState('');
+
+   // State for ranged revert
+  const [startMonth, setStartMonth] = useState<number>(new Date().getMonth());
+  const [startYear, setStartYear] = useState<number>(new Date().getFullYear());
+  const [endMonth, setEndMonth] = useState<number>(new Date().getMonth());
+  const [endYear, setEndYear] = useState<number>(new Date().getFullYear());
+  const [isRevertingByRange, setIsRevertingByRange] = useState(false);
 
 
   const pendingInstallmentsQuery = useMemoFirebase(
@@ -106,6 +123,96 @@ export default function ValidationPage() {
       setIsProcessingOverdue(false);
     }
   };
+
+  const handleRevertOverdueToPending = async () => {
+    if (!firestore) return;
+    setIsRevertingOverdue(true);
+    
+    try {
+      const overdueQuery = query(collection(firestore, 'installments'), where('status', '==', 'overdue'));
+      const querySnapshot = await getDocs(overdueQuery);
+      
+      if (querySnapshot.empty) {
+        toast({ title: 'Sin Cambios', description: 'No hay cuotas atrasadas para revertir.' });
+        setIsRevertingOverdue(false);
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      querySnapshot.forEach(docSnap => {
+        batch.update(docSnap.ref, { status: 'pending' });
+      });
+
+      await batch.commit();
+
+      toast({
+        title: '¡Reversión Completa!',
+        description: `Se han revertido ${querySnapshot.size} cuota(s) de "atrasada" a "pendiente".`,
+      });
+
+    } catch (error) {
+      console.error('Error reverting overdue installments:', error);
+      toast({ title: 'Error', description: 'Ocurrió un error al revertir las cuotas.', variant: 'destructive' });
+    } finally {
+      setIsRevertingOverdue(false);
+    }
+  };
+
+  const handleRevertOverdueByRange = async () => {
+    if (!firestore) return;
+    setIsRevertingByRange(true);
+
+    try {
+      const startDate = startOfMonth(new Date(startYear, startMonth));
+      const endDate = endOfMonth(new Date(endYear, endMonth));
+
+      if (isBefore(endDate, startDate)) {
+        toast({ title: 'Error de Rango', description: 'La fecha de fin no puede ser anterior a la fecha de inicio.', variant: 'destructive' });
+        setIsRevertingByRange(false);
+        return;
+      }
+
+      const overdueQuery = query(
+        collection(firestore, 'installments'),
+        where('status', '==', 'overdue')
+      );
+
+      const querySnapshot = await getDocs(overdueQuery);
+      if (querySnapshot.empty) {
+        toast({ title: 'Sin Cambios', description: 'No hay cuotas atrasadas para revertir en la base de datos.' });
+        setIsRevertingByRange(false);
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      let revertedCount = 0;
+
+      querySnapshot.forEach(docSnap => {
+        const installment = docSnap.data() as Installment;
+        const dueDate = parseISO(installment.dueDate);
+        if (dueDate >= startDate && dueDate <= endDate) {
+          batch.update(docSnap.ref, { status: 'pending' });
+          revertedCount++;
+        }
+      });
+
+      if (revertedCount === 0) {
+        toast({ title: 'Sin Cambios', description: 'No se encontraron cuotas atrasadas que coincidieran con el rango de fechas seleccionado.' });
+      } else {
+        await batch.commit();
+        toast({
+          title: '¡Reversión Completa!',
+          description: `Se han revertido ${revertedCount} cuota(s) de "atrasada" a "pendiente" en el rango seleccionado.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error reverting overdue installments by range:', error);
+      toast({ title: 'Error', description: 'Ocurrió un error al revertir las cuotas por rango.', variant: 'destructive' });
+    } finally {
+      setIsRevertingByRange(false);
+    }
+  };
+
 
   const handleGenerateMissingReceipts = async () => {
     if (!firestore) {
@@ -384,7 +491,7 @@ export default function ValidationPage() {
                     const installmentData = installmentDoc.data() as Installment;
                     const dueDate = new Date(installmentData.dueDate);
                     const newStatus = isBefore(dueDate, startOfToday()) ? 'overdue' : 'pending';
-                    transaction.update(installmentDoc.ref, { status: newStatus, paymentDate: null });
+                    transaction.update(installmentDoc.ref, { status: newStatus, paymentDate: null, paymentId: null, receiptId: null });
                 }
             }
 
@@ -483,26 +590,102 @@ export default function ValidationPage() {
         <h1 className="font-semibold text-lg md:text-2xl">Validación de Datos</h1>
       </div>
 
-        <Card>
-            <CardHeader>
-                <CardTitle>Generar Recibos Faltantes</CardTitle>
-                <CardDescription>
-                Esta herramienta busca cuotas pagadas que no tienen un recibo asociado y los genera retroactivamente.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button onClick={handleGenerateMissingReceipts} disabled={isGeneratingReceipts}>
-                    {isGeneratingReceipts ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Receipt className="mr-2 h-4 w-4" />}
-                    {isGeneratingReceipts ? 'Generando...' : 'Generar Recibos para Pagos Antiguos'}
-                </Button>
-            </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Marcar Cuotas Atrasadas</CardTitle>
+          <CardDescription>
+            Este proceso revisará todas las cuotas con estado "pendiente" y las marcará como "atrasadas" si su fecha de vencimiento ya pasó.
+            Es recomendable ejecutar este proceso periódicamente para mantener los datos actualizados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-4">
+          <p className="text-sm text-muted-foreground">
+            Actualmente hay <span className="font-bold text-foreground">{pendingInstallments?.length ?? 0}</span> cuota(s) pendientes por revisar.
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={handleUpdateOverdue} disabled={isProcessingOverdue || isRevertingOverdue}>
+              {isProcessingOverdue ? ( <Loader className="mr-2 h-4 w-4 animate-spin" /> ) : ( <ShieldCheck className="mr-2 h-4 w-4" /> )}
+              {isProcessingOverdue ? 'Procesando...' : 'Actualizar Cuotas Atrasadas'}
+            </Button>
+            <Button variant="outline" onClick={handleRevertOverdueToPending} disabled={isProcessingOverdue || isRevertingOverdue}>
+                {isRevertingOverdue ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                {isRevertingOverdue ? 'Revirtiendo...' : 'Revertir Todas a Pendientes'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-       <Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Revertir Cuotas Atrasadas por Rango</CardTitle>
+          <CardDescription>
+            Si marcaste cuotas como "atrasadas" por error en un periodo específico, puedes revertirlas a "pendientes" aquí.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="grid gap-1.5">
+              <Label>Fecha de Inicio</Label>
+              <div className="flex gap-2">
+                <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
+                  <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {months.map(m => <SelectItem key={m.value} value={String(m.value)}><span className="capitalize">{m.label}</span></SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={String(startYear)} onValueChange={(v) => setStartYear(Number(v))}>
+                  <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Fecha de Fin</Label>
+              <div className="flex gap-2">
+                <Select value={String(endMonth)} onValueChange={(v) => setEndMonth(Number(v))}>
+                  <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {months.map(m => <SelectItem key={m.value} value={String(m.value)}><span className="capitalize">{m.label}</span></SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={String(endYear)} onValueChange={(v) => setEndYear(Number(v))}>
+                  <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button onClick={handleRevertOverdueByRange} disabled={isRevertingByRange}>
+              {isRevertingByRange ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+              {isRevertingByRange ? 'Revirtiendo...' : 'Revertir en Rango'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+            <CardTitle>Generar Recibos Faltantes</CardTitle>
+            <CardDescription>
+            Esta herramienta busca cuotas pagadas que no tienen un recibo asociado y los genera retroactivamente.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button onClick={handleGenerateMissingReceipts} disabled={isGeneratingReceipts}>
+                {isGeneratingReceipts ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Receipt className="mr-2 h-4 w-4" />}
+                {isGeneratingReceipts ? 'Generando...' : 'Generar Recibos para Pagos Antiguos'}
+            </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle>Revertir Pago</CardTitle>
           <CardDescription>
-            Si un pago se registró por error, puedes revertirlo aquí. Esto eliminará el registro del pago y devolverá la(s) cuota(s) asociadas a un estado pendiente.
+            Si un pago se registró por error, puedes revertirlo aquí. Esto eliminará el registro del pago y devolverá la(s) cuota(s) asociadas a un estado pendiente/atrasada.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-4">
@@ -521,7 +704,7 @@ export default function ValidationPage() {
         </CardContent>
       </Card>
       
-       <Card>
+      <Card>
         <CardHeader>
           <CardTitle>Corregir Fecha de Pago</CardTitle>
           <CardDescription>
@@ -553,29 +736,6 @@ export default function ValidationPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Marcar Cuotas Atrasadas</CardTitle>
-          <CardDescription>
-            Este proceso revisará todas las cuotas con estado "pendiente" y las marcará como "atrasadas" si su fecha de vencimiento ya pasó.
-            Es recomendable ejecutar este proceso periódicamente para mantener los datos actualizados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-start gap-4">
-          <p className="text-sm text-muted-foreground">
-            Actualmente hay <span className="font-bold text-foreground">{pendingInstallments?.length ?? 0}</span> cuota(s) pendientes por revisar.
-          </p>
-          <Button onClick={handleUpdateOverdue} disabled={isProcessingOverdue}>
-            {isProcessingOverdue ? (
-              <Loader className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ShieldCheck className="mr-2 h-4 w-4" />
-            )}
-            {isProcessingOverdue ? 'Procesando...' : 'Actualizar Cuotas Atrasadas'}
-          </Button>
-        </CardContent>
-      </Card>
-
-        <Card>
             <CardHeader>
                 <CardTitle>Corregir Fechas de Pago en Cuotas</CardTitle>
                 <CardDescription>
@@ -600,7 +760,7 @@ export default function ValidationPage() {
             </CardContent>
         </Card>
 
-       <Card>
+      <Card>
         <CardHeader>
           <CardTitle>Corregir Pagos Históricos (Desglose)</CardTitle>
           <CardDescription>
