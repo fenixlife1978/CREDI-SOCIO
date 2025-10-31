@@ -78,6 +78,10 @@
           "type": "string",
           "description": "The start date of the loan.",
           "format": "date-time"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The ID of the partner who owns this loan."
         }
       },
       "required": [
@@ -86,7 +90,8 @@
         "totalAmount",
         "numberOfInstallments",
         "interestRate",
-        "startDate"
+        "startDate",
+        "ownerId"
       ]
     },
     "Installment": {
@@ -135,6 +140,10 @@
         "totalAmount": {
           "type": "number",
           "description": "The total amount for the installment (capital + interest)."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The ID of the partner who owns this installment."
         }
       },
       "required": [
@@ -145,7 +154,8 @@
         "status",
         "capitalAmount",
         "interestAmount",
-        "totalAmount"
+        "totalAmount",
+        "ownerId"
       ]
     },
     "Payment": {
@@ -184,6 +194,10 @@
         "interestAmount": {
           "type": "number",
           "description": "The interest amount portion of the payment."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The ID of the partner who made this payment."
         }
       },
       "required": [
@@ -192,7 +206,8 @@
         "installmentIds",
         "totalAmount",
         "capitalAmount",
-        "interestAmount"
+        "interestAmount",
+        "ownerId"
       ]
     },
     "Receipt": {
@@ -228,6 +243,10 @@
         "interestAmount": {
           "type": "number",
           "description": "The interest amount paid."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The ID of the partner this receipt belongs to."
         }
       },
       "required": [
@@ -236,7 +255,8 @@
         "generationDate",
         "amount",
         "capitalAmount",
-        "interestAmount"
+        "interestAmount",
+        "ownerId"
       ]
     },
     "Report": {
@@ -323,3 +343,5 @@
     }
   }
 }
+
+    

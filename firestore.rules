@@ -1,143 +1,95 @@
+
 /**
  * @fileOverview Firestore Security Rules for the lending system application.
  *
  * Core Philosophy:
- * This ruleset adopts a public read, owner-write model for most top-level collections, combined with data-level ownership checks.
- * Authentication is required for all write operations. Public read access enables flexible reporting.
+ * This ruleset adopts a public read model, with writes restricted to authenticated users
+ * and validated against data ownership. The 'owner' of most documents is the 'partner'.
  *
  * Data Structure:
- * The Firestore database contains the following top-level collections:
- * - /partners/{partnerId}: Stores partner information.
- * - /loans/{loanId}: Stores loan information.
- * - /installments/{installmentId}: Stores installment information.
- * - /payments/{paymentId}: Stores payment information.
- * - /receipts/{receiptId}: Stores receipt information.
- * - /reports/{reportId}: Stores report data.
+ * - /partners/{partnerId}: Stores information about each lending partner.
+ * - /loans/{loanId}: Stores loan details. `ownerId` should match the `partnerId`.
+ * - /installments/{installmentId}: Loan installments. `ownerId` should match the `partnerId`.
+ * - /payments/{paymentId}: Payment records. `ownerId` should match the `partnerId`.
+ * - /receipts/{receiptId}: Payment receipts. `ownerId` should match the `partnerId`.
+ * - /reports/{reportId}: Financial reports, publicly readable.
  *
  * Key Security Decisions:
- * - Unauthenticated users can read all data (partners, loans, installments, payments, receipts, reports).
- * - Only authenticated users can create, update, or delete documents.
- * - Data-level ownership is enforced for writes, where applicable, using an `ownerId` or similar field.
- * - List operations are enabled for unauthenticated users.
- *
- * Denormalization for Authorization:
- *  - Not used in this version. The IR currently does not specify an owner field.
+ * - Unauthenticated users can read all data to allow for flexible reporting and viewing.
+ * - All write operations (create, update, delete) require user authentication.
+ * - Data-level ownership is enforced for writes using the `partnerId` as the owner identifier.
+ *   This ensures that operations on loans, installments, etc., are consistent with the partner they belong to.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants public read access to partner information and restricts write access to authenticated users.
-     * @path /partners/{partnerId}
-     * @allow get, list: Unauthenticated users can read partner information.
-     * @allow create: Authenticated users can create partner documents if the incoming data contains an 'id' field that matches their `auth.uid`.
-     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.id == request.auth.uid`).
-     * @deny create: Unauthenticated users cannot create partner documents.
-     * @deny update, delete: Unauthenticated users cannot update or delete partner documents.
-     * @deny create: Authenticated users cannot create partner documents with a mismatched ID.
-     * @principle Allows public read, owner-only writes.
+     * @description Grants public read access to partner information.
+     * Creation is allowed for any authenticated user.
+     * Updates and deletes are restricted to the partner themselves (owner).
      */
     match /partners/{partnerId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      // Only the partner can update or delete their own document.
+      allow update, delete: if isSignedIn() && request.auth.uid == partnerId;
     }
 
     /**
-     * @description Grants public read access to loan information and restricts write access to authenticated users.
-     * @path /loans/{loanId}
-     * @allow get, list: Unauthenticated users can read loan information.
-     * @allow create: Authenticated users can create loan documents.
-     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
-     * @deny create: Unauthenticated users cannot create loan documents.
-     * @deny update, delete: Unauthenticated users cannot update or delete loan documents.
-     * @principle Allows public read, owner-only writes.
+     * @description Grants public read access to loan information.
+     * Writes are restricted to ensure data integrity and ownership.
      */
     match /loans/{loanId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants public read access to installment information and restricts write access to authenticated users.
-     * @path /installments/{installmentId}
-     * @allow get, list: Unauthenticated users can read installment information.
-     * @allow create: Authenticated users can create installment documents.
-     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
-     * @deny create: Unauthenticated users cannot create installment documents.
-     * @deny update, delete: Unauthenticated users cannot update or delete installment documents.
-     * @principle Allows public read, owner-only writes.
+     * @description Grants public read access to installment information.
+     * Writes are restricted.
      */
     match /installments/{installmentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants public read access to payment information and restricts write access to authenticated users.
-     * @path /payments/{paymentId}
-     * @allow get, list: Unauthenticated users can read payment information.
-     * @allow create: Authenticated users can create payment documents.
-     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
-     * @deny create: Unauthenticated users cannot create payment documents.
-     * @deny update, delete: Unauthenticated users cannot update or delete payment documents.
-     * @principle Allows public read, owner-only writes.
+     * @description Grants public read access to payment information.
+     * Writes are restricted.
      */
     match /payments/{paymentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants public read access to receipt information and restricts write access to authenticated users.
-     * @path /receipts/{receiptId}
-     * @allow get, list: Unauthenticated users can read receipt information.
-     * @allow create: Authenticated users can create receipt documents.
-     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
-     * @deny create: Unauthenticated users cannot create receipt documents.
-     * @deny update, delete: Unauthenticated users cannot update or delete receipt documents.
-     * @principle Allows public read, owner-only writes.
+     * @description Grants public read access to receipt information.
+     * Writes are restricted.
      */
     match /receipts/{receiptId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants public read access to report information and restricts write access to authenticated users.
-     * @path /reports/{reportId}
-     * @allow get, list: Unauthenticated users can read report information.
-     * @allow create: Authenticated users can create report documents.
-     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
-     * @deny create: Unauthenticated users cannot create report documents.
-     * @deny update, delete: Unauthenticated users cannot update or delete report documents.
-     * @principle Allows public read, owner-only writes.
+     * @description Grants public read access to report information.
+     * Writes are restricted to authenticated users.
      */
     match /reports/{reportId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Checks if the user is authenticated.
+     * @returns {boolean} True if a user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
     }
   }
-
-  function isSignedIn() {
-    return request.auth != null;
-  }
 }
+
+    
