@@ -447,78 +447,73 @@ export default function ValidationPage() {
   };
 
   const handleRevertPayment = async () => {
-    // Sanitize the input to remove any character that is not a letter or a number.
     const sanitizedId = paymentIdToRevert.replace(/[^a-zA-Z0-9]/g, '');
-
+  
     if (!firestore || !sanitizedId) {
       toast({ title: 'Error', description: 'Por favor, proporciona un ID de pago válido.', variant: 'destructive' });
       return;
     }
-
+  
     setIsRevertingPayment(true);
-
+  
     try {
-        await runTransaction(firestore, async (transaction) => {
-            const paymentRef = doc(firestore, 'payments', sanitizedId);
-            const paymentDoc = await transaction.get(paymentRef);
-
-            if (!paymentDoc.exists()) {
-                throw new Error(`El pago con ID ${sanitizedId} no fue encontrado.`);
-            }
-
-            const paymentData = paymentDoc.data() as Payment;
-            const { installmentIds, loanId } = paymentData;
-
-            // --- ALL READS MUST BE FIRST ---
-
-            // Read all associated installments first
-            const installmentDocs = await Promise.all(
-                installmentIds.map(id => transaction.get(doc(firestore, 'installments', id)))
-            );
-
-            // Read the loan document
-            let loanDoc: any = null;
-            if (loanId) {
-                const loanRef = doc(firestore, 'loans', loanId);
-                loanDoc = await transaction.get(loanRef);
-            }
-
-            // --- ALL WRITES MUST BE AFTER READS ---
-
-            // 1. Revert installment status
-            for (const installmentDoc of installmentDocs) {
-                if (installmentDoc.exists()) {
-                    const installmentData = installmentDoc.data() as Installment;
-                    const dueDate = new Date(installmentData.dueDate);
-                    const newStatus = isBefore(dueDate, startOfToday()) ? 'overdue' : 'pending';
-                    transaction.update(installmentDoc.ref, { status: newStatus, paymentDate: null, paymentId: null, receiptId: null });
-                }
-            }
-
-            // 2. Revert loan status if it was 'Finalizado'
-            if (loanDoc && loanDoc.exists() && loanDoc.data().status === 'Finalizado') {
-                transaction.update(loanDoc.ref, { status: 'Active' });
-            }
-
-            // 3. Delete the payment document
-            transaction.delete(paymentRef);
-        });
-
-        toast({
-            title: '¡Pago Revertido!',
-            description: `El pago ${sanitizedId} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
-        });
-        setPaymentIdToRevert('');
-
+      await runTransaction(firestore, async (transaction) => {
+        const paymentRef = doc(firestore, 'payments', sanitizedId);
+        const paymentDoc = await transaction.get(paymentRef);
+  
+        if (!paymentDoc.exists()) {
+          throw new Error(`El pago con ID ${sanitizedId} no fue encontrado.`);
+        }
+  
+        const paymentData = paymentDoc.data() as Payment;
+        const { installmentIds, loanId } = paymentData;
+  
+        const installmentDocs = await Promise.all(
+          installmentIds.map(id => transaction.get(doc(firestore, 'installments', id)))
+        );
+  
+        let loanDoc: any = null;
+        if (loanId) {
+          const loanRef = doc(firestore, 'loans', loanId);
+          loanDoc = await transaction.get(loanRef);
+        }
+  
+        for (const installmentDoc of installmentDocs) {
+          if (installmentDoc.exists()) {
+            const installmentData = installmentDoc.data() as Installment;
+            const dueDate = new Date(installmentData.dueDate);
+            const newStatus = isBefore(dueDate, startOfToday()) ? 'overdue' : 'pending';
+            transaction.update(installmentDoc.ref, { status: newStatus, paymentDate: null, paymentId: null, receiptId: null });
+          }
+        }
+  
+        if (loanDoc && loanDoc.exists() && loanDoc.data().status === 'Finalizado') {
+          transaction.update(loanDoc.ref, { status: 'Active' });
+        }
+  
+        transaction.delete(paymentRef);
+      });
+  
+      toast({
+        title: '¡Pago Revertido!',
+        description: `El pago ${sanitizedId} ha sido eliminado y las cuotas asociadas han sido restauradas a pendientes.`,
+      });
+      setPaymentIdToRevert('');
+  
     } catch (error: any) {
-        console.error('Error reverting payment:', error);
+        const permissionError = new FirestorePermissionError({
+            path: `payments/${sanitizedId}`,
+            operation: 'delete', // The transaction combines multiple operations, but 'delete' is a key part.
+        });
+        errorEmitter.emit('permission-error', permissionError);
+
         toast({
             title: 'Error al Revertir',
-            description: error.message || 'Ocurrió un error. Inténtalo de nuevo.',
+            description: 'No se pudo completar la reversión. Revisa la consola para más detalles.',
             variant: 'destructive',
         });
     } finally {
-        setIsRevertingPayment(false);
+      setIsRevertingPayment(false);
     }
   };
 
