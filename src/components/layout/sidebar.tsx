@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,12 +36,16 @@ const navItems = [
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldCheck },
 ];
 
-function CrediManageLogo() {
+function AppLogo() {
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
-       <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
-        <div className="w-4 h-4 rounded-full bg-sidebar-background" />
-      </div>
+       <Image 
+        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s" 
+        alt="Logo"
+        width={40}
+        height={40}
+        className="rounded-md"
+        />
       <span className="group-data-[collapsible=icon]:hidden">LOAN MANAGER</span>
     </div>
   );
@@ -65,7 +70,7 @@ export function AppSidebar() {
             'group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
           )}
         >
-            <CrediManageLogo />
+            <AppLogo />
         </div>
       </SidebarHeader>
       <SidebarContent className="p-2">

@@ -9,6 +9,7 @@ import type { Receipt } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useReactToPrint } from 'react-to-print';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -100,7 +101,16 @@ export default function ReceiptPage() {
         <div ref={printRef} className="p-2">
             <Card className="w-full max-w-2xl mx-auto shadow-none border-gray-300 print:shadow-none print:border-none">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">Recibo de Pago</CardTitle>
+                    <div className="flex justify-center items-center gap-4 mb-4">
+                        <Image 
+                            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s"
+                            alt="Logo"
+                            width={60}
+                            height={60}
+                            className="rounded-md"
+                        />
+                        <CardTitle className="text-2xl">Recibo de Pago</CardTitle>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <Separator />

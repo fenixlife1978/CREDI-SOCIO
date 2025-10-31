@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Lock } from 'lucide-react';
+import Image from 'next/image';
 
 export default function LockPage() {
   const [pin, setPin] = useState('');
@@ -49,7 +50,13 @@ export default function LockPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-                <Lock className="w-10 h-10 text-primary"/>
+                <Image 
+                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s"
+                    alt="Logo"
+                    width={80}
+                    height={80}
+                    className="rounded-full"
+                />
             </div>
           <CardTitle>Acceso Restringido</CardTitle>
           <CardDescription>
