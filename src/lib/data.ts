@@ -82,12 +82,3 @@ export type Receipt = {
       interestAmount: number;
     };
 };
-
-
-export type CompanyProfile = {
-  companyName: string;
-  address: string;
-  phone: string;
-  email: string;
-  rif: string;
-};

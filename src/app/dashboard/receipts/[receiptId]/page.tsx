@@ -5,7 +5,7 @@ import { useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { Receipt, CompanyProfile } from '@/lib/data';
+import type { Receipt } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useReactToPrint } from 'react-to-print';
@@ -57,19 +57,13 @@ export default function ReceiptPage() {
     [firestore, receiptId]
   );
   const { data: receipt, isLoading: receiptLoading } = useDoc<Receipt>(receiptRef);
-  
-  const companyProfileRef = useMemoFirebase(() =>
-    (firestore) ? doc(firestore, 'settings', 'companyProfile') : null,
-    [firestore]
-  );
-  const { data: companyProfile, isLoading: profileLoading } = useDoc<CompanyProfile>(companyProfileRef);
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
     documentTitle: `Recibo-${receipt?.id.slice(-6)}`,
   });
 
-  const isLoading = receiptLoading || profileLoading;
+  const isLoading = receiptLoading;
 
   if (isLoading) {
     return <ReceiptSkeleton />;
@@ -104,11 +98,7 @@ export default function ReceiptPage() {
         <div ref={printRef} className="p-2">
             <Card className="w-full max-w-2xl mx-auto shadow-none border-gray-300 print:shadow-none print:border-none">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">{companyProfile?.companyName || 'Recibo de Pago'}</CardTitle>
-                    <CardDescription>
-                        {companyProfile?.address} <br />
-                        {companyProfile?.phone} | {companyProfile?.email} | RIF: {companyProfile?.rif}
-                    </CardDescription>
+                    <CardTitle className="text-2xl">Recibo de Pago</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <Separator />

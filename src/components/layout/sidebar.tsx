@@ -14,7 +14,6 @@ import {
   Users,
   Landmark,
   DollarSign,
-  Settings,
   LogOut,
   Sun,
   ShieldCheck,
@@ -34,7 +33,6 @@ const navItems = [
   { href: '/dashboard/receipts', label: 'Recibos', icon: Receipt },
   { href: '/dashboard/reports', label: 'Reportes', icon: FileText },
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldCheck },
-  { href: '/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
 
 function CrediManageLogo() {
