@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts"
 import { useCollection } from "@/firebase/firestore/use-collection";
 import { useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query } from "firebase/firestore";
-import type { Payment } from "@/lib/data";
+import { collection, query, where } from "firebase/firestore";
+import type { Installment } from "@/lib/data";
 import { format, parseISO, getMonth, getYear, getDate, getDaysInMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -51,11 +51,11 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
 
 export function OverviewChart() {
   const firestore = useFirestore();
-  const paymentsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'payments')) : null),
+  const paidInstallmentsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'paid')) : null),
     [firestore]
   );
-  const { data: payments } = useCollection<Payment>(paymentsQuery);
+  const { data: paidInstallments } = useCollection<Installment>(paidInstallmentsQuery);
 
   const data = useMemo(() => {
     const now = new Date();
@@ -69,25 +69,26 @@ export function OverviewChart() {
       "Intereses Ganados": 0,
     }));
 
-    if (payments) {
-      payments.forEach(payment => {
+    if (paidInstallments) {
+      paidInstallments.forEach(installment => {
+        if (!installment.paymentDate) return;
         try {
-            const paymentDate = parseISO(payment.paymentDate);
+            const paymentDate = parseISO(installment.paymentDate);
             if (getMonth(paymentDate) === currentMonth && getYear(paymentDate) === currentYear) {
                 const dayOfMonth = getDate(paymentDate) - 1; // 0-indexed
                 if (dailyData[dayOfMonth]) {
-                    dailyData[dayOfMonth]["Pagos Recibidos"] += payment.totalAmount;
-                    dailyData[dayOfMonth]["Intereses Ganados"] += payment.interestAmount;
+                    dailyData[dayOfMonth]["Pagos Recibidos"] += installment.totalAmount;
+                    dailyData[dayOfMonth]["Intereses Ganados"] += installment.interestAmount;
                 }
             }
         } catch (e) {
-            // Ignore payments with invalid date formats
+            // Ignore installments with invalid date formats
         }
       });
     }
 
     return dailyData;
-  }, [payments]);
+  }, [paidInstallments]);
   
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',

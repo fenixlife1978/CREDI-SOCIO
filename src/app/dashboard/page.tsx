@@ -10,7 +10,7 @@ import { DollarSign, Landmark, Users, CreditCard } from "lucide-react"
 import { OverviewChart } from "./overview-chart";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
-import type { Payment, Partner, Loan } from "@/lib/data";
+import type { Installment, Partner, Loan } from "@/lib/data";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -45,11 +45,11 @@ function StatCard({ title, value, icon, description, isLoading, className }: { t
 export default function DashboardPage() {
   const firestore = useFirestore();
   
-  const paymentsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'payments')) : null, 
+  const paidInstallmentsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'installments'), where('status', '==', 'paid')) : null, 
     [firestore]
   );
-  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsQuery);
+  const { data: paidInstallments, isLoading: installmentsLoading } = useCollection<Installment>(paidInstallmentsQuery);
 
   const partnersQuery = useMemoFirebase(() =>
     firestore ? query(collection(firestore, 'partners')) : null,
@@ -64,21 +64,26 @@ export default function DashboardPage() {
   const { data: activeLoans, isLoading: activeLoansLoading } = useCollection<Loan>(activeLoansQuery);
 
   const { monthlyPayments, monthlyInterest } = useMemo(() => {
-    if (!payments) return { monthlyPayments: 0, monthlyInterest: 0 };
+    if (!paidInstallments) return { monthlyPayments: 0, monthlyInterest: 0 };
     
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    return payments.reduce((acc, payment) => {
-        const paymentDate = parseISO(payment.paymentDate);
-        if (getMonth(paymentDate) === currentMonth && getYear(paymentDate) === currentYear) {
-            acc.monthlyPayments += payment.totalAmount;
-            acc.monthlyInterest += payment.interestAmount;
+    return paidInstallments.reduce((acc, installment) => {
+        if (!installment.paymentDate) return acc;
+        try {
+            const paymentDate = parseISO(installment.paymentDate);
+            if (getMonth(paymentDate) === currentMonth && getYear(paymentDate) === currentYear) {
+                acc.monthlyPayments += installment.totalAmount;
+                acc.monthlyInterest += installment.interestAmount;
+            }
+        } catch(e) {
+            // Ignore invalid dates
         }
         return acc;
     }, { monthlyPayments: 0, monthlyInterest: 0 });
-  }, [payments]);
+  }, [paidInstallments]);
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
@@ -87,7 +92,7 @@ export default function DashboardPage() {
     maximumFractionDigits: 0,
   });
 
-  const isLoading = paymentsLoading || partnersLoading || activeLoansLoading;
+  const isLoading = installmentsLoading || partnersLoading || activeLoansLoading;
 
   return (
     <div className="flex flex-col gap-6">
