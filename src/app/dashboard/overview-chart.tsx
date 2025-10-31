@@ -1,22 +1,28 @@
 "use client"
 
 import { useMemo } from 'react';
-import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts"
+import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts"
 import { useCollection } from "@/firebase/firestore/use-collection";
 import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
-import type { Loan } from "@/lib/data";
-import { format, subMonths } from 'date-fns';
+import type { Payment } from "@/lib/data";
+import { format, parseISO, getMonth, getYear, getDate, getDaysInMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
+    const currencyFormatter = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    });
     return (
       <div className="rounded-lg border bg-background p-2 shadow-sm">
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col space-y-1">
             <span className="text-[0.70rem] uppercase text-muted-foreground">
-              {label}
+              {`Día ${label}`}
             </span>
              {payload.map((p, i) => (
               <span key={i} className="font-bold" style={{color: p.color}}>
@@ -24,13 +30,13 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
               </span>
             ))}
           </div>
-          <div className="flex flex-col space-y-1">
+          <div className="flex flex-col space-y-1 text-right">
             <span className="text-[0.70rem] uppercase text-muted-foreground">
               Total
             </span>
             {payload.map((p, i) => (
                 <span key={i} className="font-bold" style={{color: p.color}}>
-                    {`$${p.value}`}
+                    {currencyFormatter.format(p.value as number)}
                 </span>
             ))}
           </div>
@@ -45,53 +51,55 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
 
 export function OverviewChart() {
   const firestore = useFirestore();
-  const loansQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'loans')) : null),
+  const paymentsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'payments')) : null),
     [firestore]
   );
-  const { data: loans } = useCollection<Loan>(loansQuery);
+  const { data: payments } = useCollection<Payment>(paymentsQuery);
 
   const data = useMemo(() => {
     const now = new Date();
-    const monthlyData = Array.from({ length: 6 }).map((_, i) => {
-      const date = subMonths(now, 5 - i);
-      return {
-        name: format(date, 'MMM', { locale: es }),
-        lent: 0,
-        recovered: 0,
-      };
-    });
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const numDays = getDaysInMonth(now);
 
-    if (loans) {
-      loans.forEach(loan => {
-        const loanDate = new Date(loan.startDate);
-        const monthIndex = 5 - (now.getMonth() - loanDate.getMonth() + 12 * (now.getFullYear() - loanDate.getFullYear()));
+    const dailyData = Array.from({ length: numDays }, (_, i) => ({
+      name: (i + 1).toString(),
+      "Pagos Recibidos": 0,
+      "Intereses Ganados": 0,
+    }));
 
-        if (monthIndex >= 0 && monthIndex < 6) {
-          monthlyData[monthIndex].lent += loan.totalAmount;
-          if (loan.status === 'Finalizado') {
-            monthlyData[monthIndex].recovered += loan.totalAmount;
-          }
+    if (payments) {
+      payments.forEach(payment => {
+        try {
+            const paymentDate = parseISO(payment.paymentDate);
+            if (getMonth(paymentDate) === currentMonth && getYear(paymentDate) === currentYear) {
+                const dayOfMonth = getDate(paymentDate) - 1; // 0-indexed
+                if (dailyData[dayOfMonth]) {
+                    dailyData[dayOfMonth]["Pagos Recibidos"] += payment.totalAmount;
+                    dailyData[dayOfMonth]["Intereses Ganados"] += payment.interestAmount;
+                }
+            }
+        } catch (e) {
+            // Ignore payments with invalid date formats
         }
       });
     }
 
-    return monthlyData;
-  }, [loans]);
+    return dailyData;
+  }, [payments]);
+  
+  const currencyFormatter = new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+    notation: 'compact'
+  });
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <AreaChart data={data}>
-        <defs>
-            <linearGradient id="colorLent" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-            </linearGradient>
-            <linearGradient id="colorRecovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
-            </linearGradient>
-        </defs>
+      <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
         <XAxis
           dataKey="name"
@@ -99,22 +107,23 @@ export function OverviewChart() {
           fontSize={12}
           tickLine={false}
           axisLine={false}
+          tickFormatter={(value) => `Día ${value}`}
         />
         <YAxis
           stroke="hsl(var(--muted-foreground))"
           fontSize={12}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `$${value}`}
+          tickFormatter={(value) => currencyFormatter.format(value as number)}
         />
         <Tooltip
             content={<CustomTooltip />}
             cursor={{ fill: "hsl(var(--muted))", opacity: 0.5 }}
         />
         <Legend wrapperStyle={{paddingTop: '20px'}}/>
-        <Area type="monotone" dataKey="lent" name="Pagado este mes" stroke="hsl(var(--primary))" fill="url(#colorLent)" />
-        <Area type="monotone" dataKey="recovered" name="Vencimiento del pago" stroke="hsl(var(--accent))" fill="url(#colorRecovered)" />
-      </AreaChart>
+        <Bar dataKey="Pagos Recibidos" fill="hsl(var(--primary))" name="Pagos Recibidos" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Intereses Ganados" fill="hsl(var(--accent))" name="Intereses Ganados" radius={[4, 4, 0, 0]} />
+      </BarChart>
     </ResponsiveContainer>
   )
 }

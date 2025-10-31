@@ -6,14 +6,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { DollarSign, Landmark, Users, Activity } from "lucide-react"
+import { DollarSign, Landmark, Users, CreditCard } from "lucide-react"
 import { OverviewChart } from "./overview-chart";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
-import type { Loan, Partner } from "@/lib/data";
+import type { Payment, Partner, Loan } from "@/lib/data";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getMonth, getYear, parseISO } from 'date-fns';
 
 function StatCard({ title, value, icon, description, isLoading, className }: { title: string, value: string, icon: React.ReactNode, description?: string, isLoading: boolean, className?: string }) {
     return (
@@ -44,11 +45,11 @@ function StatCard({ title, value, icon, description, isLoading, className }: { t
 export default function DashboardPage() {
   const firestore = useFirestore();
   
-  const loansQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'loans')) : null, 
+  const paymentsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'payments')) : null, 
     [firestore]
   );
-  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
+  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsQuery);
 
   const partnersQuery = useMemoFirebase(() =>
     firestore ? query(collection(firestore, 'partners')) : null,
@@ -57,71 +58,73 @@ export default function DashboardPage() {
   const { data: partners, isLoading: partnersLoading } = useCollection<Partner>(partnersQuery);
 
   const activeLoansQuery = useMemoFirebase(() =>
-    firestore ? query(collection(firestore, 'loans'), where('status', '==', 'Active')) : null,
+    firestore ? query(collection(firestore, 'loans'), where('status', 'in', ['Active', 'Overdue'])) : null,
     [firestore]
   );
   const { data: activeLoans, isLoading: activeLoansLoading } = useCollection<Loan>(activeLoansQuery);
 
-  const { totalLent, totalInterest, paymentDue } = useMemo(() => {
-    if (!loans) return { totalLent: 0, totalInterest: 0, paymentDue: 0 };
-    return loans.reduce((acc, loan) => {
-        const interestRate = loan.interestRate || 0;
-        const interest = loan.totalAmount * (interestRate / 100);
-        acc.totalLent += loan.totalAmount;
-        if (loan.status === 'Finalizado') {
-            acc.totalInterest += interest;
-        }
-        if ((loan.status === 'Active' || loan.status === 'Overdue') && loan.numberOfInstallments && loan.numberOfInstallments > 0) {
-          const monthlyPayment = (loan.totalAmount * (1 + interestRate / 100)) / loan.numberOfInstallments;
-          acc.paymentDue += monthlyPayment;
+  const { monthlyPayments, monthlyInterest } = useMemo(() => {
+    if (!payments) return { monthlyPayments: 0, monthlyInterest: 0 };
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    return payments.reduce((acc, payment) => {
+        const paymentDate = parseISO(payment.paymentDate);
+        if (getMonth(paymentDate) === currentMonth && getYear(paymentDate) === currentYear) {
+            acc.monthlyPayments += payment.totalAmount;
+            acc.monthlyInterest += payment.interestAmount;
         }
         return acc;
-    }, { totalLent: 0, totalInterest: 0, paymentDue: 0 });
-  }, [loans]);
+    }, { monthlyPayments: 0, monthlyInterest: 0 });
+  }, [payments]);
 
-  const currencyFormatter = new Intl.NumberFormat('en-US', {
+  const currencyFormatter = new Intl.NumberFormat('es-CO', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 
-  const isLoading = loansLoading || partnersLoading || activeLoansLoading;
+  const isLoading = paymentsLoading || partnersLoading || activeLoansLoading;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
-            title="Préstamos Activos"
-            value={`${activeLoans?.length ?? 0}`}
-            icon={<Activity className="h-4 w-4" />}
+            title="Socios Activos"
+            value={`${partners?.length ?? 0}`}
+            icon={<Users className="h-5 w-5" />}
             isLoading={isLoading}
-            className="bg-[#FDC27A] text-white"
+            className="bg-primary text-primary-foreground"
         />
         <StatCard 
-            title="Pago adeudado"
-            value={currencyFormatter.format(paymentDue)}
-            icon={<DollarSign className="h-4 w-4" />}
+            title="Préstamos Activos"
+            value={`${activeLoans?.length ?? 0}`}
+            icon={<Landmark className="h-5 w-5" />}
             isLoading={isLoading}
              className="bg-[#65C466] text-white"
         />
         <StatCard 
-            title="Pagado este mes"
-            value={currencyFormatter.format(totalInterest)} // Example: using total interest as proxy
-            icon={<DollarSign className="h-4 w-4" />}
+            title="Pagos Recibidos (Mes Actual)"
+            value={currencyFormatter.format(monthlyPayments)}
+            icon={<CreditCard className="h-5 w-5" />}
             isLoading={isLoading}
              className="bg-[#FE5D56] text-white"
         />
         <StatCard 
-            title="Socios Activos"
-            value={`${partners?.length ?? 0}`}
-            icon={<Users className="h-4 w-4" />}
+            title="Intereses Ganados (Mes Actual)"
+            value={currencyFormatter.format(monthlyInterest)}
+            icon={<DollarSign className="h-5 w-5" />}
             isLoading={isLoading}
-            className="bg-primary text-primary-foreground"
+            className="bg-[#FDC27A] text-white"
         />
       </div>
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>Visión General</CardTitle>
-          <CardDescription>Capital prestado vs. recuperado en los últimos 6 meses.</CardDescription>
+          <CardDescription>Pagos recibidos vs. intereses ganados en el mes actual.</CardDescription>
         </CardHeader>
         <CardContent className="pl-2">
           {isLoading ? <Skeleton className="h-[350px] w-full" /> : <OverviewChart />}
