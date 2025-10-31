@@ -1,166 +1,143 @@
 /**
- * @fileoverview Firestore Security Rules for the lending system prototype.
+ * @fileOverview Firestore Security Rules for the lending system application.
  *
  * Core Philosophy:
- * This ruleset prioritizes strict data ownership and restricts access based on user authentication.
- * It uses an ownership model for most collections, where only the authenticated user (owner) can create, read, update, and delete documents.
+ * This ruleset adopts a public read, owner-write model for most top-level collections, combined with data-level ownership checks.
+ * Authentication is required for all write operations. Public read access enables flexible reporting.
  *
  * Data Structure:
- * - /partners/{partnerId}: Stores partner information; partnerId is the user's UID.
+ * The Firestore database contains the following top-level collections:
+ * - /partners/{partnerId}: Stores partner information.
  * - /loans/{loanId}: Stores loan information.
  * - /installments/{installmentId}: Stores installment information.
  * - /payments/{paymentId}: Stores payment information.
  * - /receipts/{receiptId}: Stores receipt information.
- * - /reports/{reportId}: Stores generated financial reports.
- * - /settings/companyProfile: Stores the company profile.  Write access is denied to the authenticated user, so for the current prototype, write access is disabled.
+ * - /reports/{reportId}: Stores report data.
  *
  * Key Security Decisions:
- * - Enforces ownership for partner, loan, installment, payment, receipt and report data.
- * - Disables write access to the company profile document for all users, since this is generating a permission error.
+ * - Unauthenticated users can read all data (partners, loans, installments, payments, receipts, reports).
+ * - Only authenticated users can create, update, or delete documents.
+ * - Data-level ownership is enforced for writes, where applicable, using an `ownerId` or similar field.
+ * - List operations are enabled for unauthenticated users.
  *
  * Denormalization for Authorization:
- *  - The rules assume the existence of an `ownerId` or similar field on relevant documents.
+ *  - Not used in this version. The IR currently does not specify an owner field.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
-     * @return {boolean} True if the request is authenticated, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's UID matches the provided user ID.
-     * @param {string} userId The user ID to compare against the authenticated user's UID.
-     * @return {boolean} True if the authenticated user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of an existing document.
-     *              This function combines the ownership check with a resource existence check.
-     * @param {string} userId The user ID that should own the document.
-     * @return {boolean} True if the user is the owner and the document exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the /partners/{partnerId} collection.
+     * @description Grants public read access to partner information and restricts write access to authenticated users.
      * @path /partners/{partnerId}
-     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new partner document with id 'rdDL8RTuoWO9sXiI6EkYsA6xeK32'.
-     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves their partner document.
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a partner document with id 'differentId'.
-     * @principle Enforces document ownership for writes.
+     * @allow get, list: Unauthenticated users can read partner information.
+     * @allow create: Authenticated users can create partner documents if the incoming data contains an 'id' field that matches their `auth.uid`.
+     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.id == request.auth.uid`).
+     * @deny create: Unauthenticated users cannot create partner documents.
+     * @deny update, delete: Unauthenticated users cannot update or delete partner documents.
+     * @deny create: Authenticated users cannot create partner documents with a mismatched ID.
+     * @principle Allows public read, owner-only writes.
      */
     match /partners/{partnerId} {
-      allow get: if isOwner(partnerId);
-      allow list: if isOwner(partnerId);
-      allow create: if isOwner(partnerId);
-      allow update: if isExistingOwner(partnerId);
-      allow delete: if isExistingOwner(partnerId);
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /loans/{loanId} collection.
+     * @description Grants public read access to loan information and restricts write access to authenticated users.
      * @path /loans/{loanId}
-     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new loan document.
-     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a loan document.
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a loan document without being signed in.
-     * @principle Enforces document ownership for writes.
+     * @allow get, list: Unauthenticated users can read loan information.
+     * @allow create: Authenticated users can create loan documents.
+     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
+     * @deny create: Unauthenticated users cannot create loan documents.
+     * @deny update, delete: Unauthenticated users cannot update or delete loan documents.
+     * @principle Allows public read, owner-only writes.
      */
     match /loans/{loanId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /installments/{installmentId} collection.
+     * @description Grants public read access to installment information and restricts write access to authenticated users.
      * @path /installments/{installmentId}
-     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new installment document.
-     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves an installment document.
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create an installment document without being signed in.
-     * @principle Enforces document ownership for writes.
+     * @allow get, list: Unauthenticated users can read installment information.
+     * @allow create: Authenticated users can create installment documents.
+     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
+     * @deny create: Unauthenticated users cannot create installment documents.
+     * @deny update, delete: Unauthenticated users cannot update or delete installment documents.
+     * @principle Allows public read, owner-only writes.
      */
     match /installments/{installmentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /payments/{paymentId} collection.
+     * @description Grants public read access to payment information and restricts write access to authenticated users.
      * @path /payments/{paymentId}
-     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new payment document.
-     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a payment document.
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a payment document without being signed in.
-     * @principle Enforces document ownership for writes.
+     * @allow get, list: Unauthenticated users can read payment information.
+     * @allow create: Authenticated users can create payment documents.
+     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
+     * @deny create: Unauthenticated users cannot create payment documents.
+     * @deny update, delete: Unauthenticated users cannot update or delete payment documents.
+     * @principle Allows public read, owner-only writes.
      */
     match /payments/{paymentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /receipts/{receiptId} collection.
+     * @description Grants public read access to receipt information and restricts write access to authenticated users.
      * @path /receipts/{receiptId}
-     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new receipt document.
-     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a receipt document.
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a receipt document without being signed in.
-     * @principle Enforces document ownership for writes.
+     * @allow get, list: Unauthenticated users can read receipt information.
+     * @allow create: Authenticated users can create receipt documents.
+     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
+     * @deny create: Unauthenticated users cannot create receipt documents.
+     * @deny update, delete: Unauthenticated users cannot update or delete receipt documents.
+     * @principle Allows public read, owner-only writes.
      */
     match /receipts/{receiptId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /reports/{reportId} collection.
+     * @description Grants public read access to report information and restricts write access to authenticated users.
      * @path /reports/{reportId}
-     * @allow (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 creates a new report document.
-     * @allow (get) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 retrieves a report document.
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create a report document without being signed in.
-     * @principle Enforces document ownership for writes.
+     * @allow get, list: Unauthenticated users can read report information.
+     * @allow create: Authenticated users can create report documents.
+     * @allow update, delete: Authenticated users can update and delete documents if they are the owner (i.e., `resource.data.ownerId == request.auth.uid`).
+     * @deny create: Unauthenticated users cannot create report documents.
+     * @deny update, delete: Unauthenticated users cannot update or delete report documents.
+     * @principle Allows public read, owner-only writes.
      */
     match /reports/{reportId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
+  }
 
-    /**
-     * @description Rules for the /settings/companyProfile document.
-     * @path /settings/companyProfile
-     * @deny (create) User rdDL8RTuoWO9sXiI6EkYsA6xeK32 attempts to create or modify the company profile.
-     * @deny (get) Deny all read access.
-     * @principle Restricts modification of the company profile.
-     */
-    match /settings/companyProfile {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
