@@ -70,8 +70,7 @@ export default function DashboardPage() {
         if (loan.status === 'Finalizado') {
             acc.totalInterest += interest;
         }
-        if (loan.status === 'Active' || loan.status === 'Overdue') {
-          // A simple calculation for payment due. This could be more complex in a real app.
+        if ((loan.status === 'Active' || loan.status === 'Overdue') && loan.numberOfInstallments > 0) {
           const monthlyPayment = (loan.totalAmount * (1 + loan.interestRate / 100)) / loan.numberOfInstallments;
           acc.paymentDue += monthlyPayment;
         }
