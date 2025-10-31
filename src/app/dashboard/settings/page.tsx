@@ -19,9 +19,10 @@ const settingsSchema = z.object({
   companyName: z.string().min(1, 'El nombre de la empresa es requerido.'),
   address: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email('Email inválido.').optional(),
+  email: z.string().email('Email inválido.').or(z.literal('')).optional(),
   rif: z.string().optional(),
 });
+
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
@@ -59,15 +60,7 @@ export default function SettingsPage() {
   const onSubmit = async (data: SettingsFormData) => {
     setIsSubmitting(true);
     try {
-      // We are removing logoUrl from the data being saved.
-      const dataToSave = {
-        companyName: data.companyName,
-        address: data.address,
-        phone: data.phone,
-        email: data.email,
-        rif: data.rif,
-      };
-      await setDoc(settingsDocRef, dataToSave, { merge: true });
+      await setDoc(settingsDocRef, data, { merge: true });
       toast({
         title: '¡Guardado!',
         description: 'La información de la empresa ha sido actualizada.',
