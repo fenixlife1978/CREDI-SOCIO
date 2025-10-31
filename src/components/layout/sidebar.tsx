@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   FileText,
   Receipt,
+  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -39,13 +40,9 @@ const navItems = [
 function AppLogo() {
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
-       <Image 
-        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s" 
-        alt="Logo"
-        width={40}
-        height={40}
-        className="rounded-md"
-        />
+      <div className="w-10 h-10 flex items-center justify-center bg-sidebar-primary text-sidebar-primary-foreground rounded-md">
+        <Landmark />
+      </div>
       <span className="group-data-[collapsible=icon]:hidden">COOP. LA CANDELARIA</span>
     </div>
   );
@@ -97,17 +94,19 @@ export function AppSidebar() {
       </SidebarContent>
       <div className='p-2 mt-auto'>
         <SidebarMenu>
-          <SidebarMenuItem>
+           <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                icon={<Sun />}
-                tooltip={{
-                  children: "Modo claro",
+                href="/dashboard/settings"
+                isActive={pathname === '/dashboard/settings'}
+                icon={<Settings />}
+                 tooltip={{
+                  children: "Ajustes",
                   className: 'bg-primary text-primary-foreground',
                 }}
               >
-                <Link href="#">
-                  <span className="group-data-[collapsible=icon]:hidden">Modo claro</span>
+                <Link href="/dashboard/settings">
+                  <span className="group-data-[collapsible=icon]:hidden">Ajustes</span>
                 </Link>
               </SidebarMenuButton>
           </SidebarMenuItem>

@@ -49,15 +49,6 @@ export default function LockPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-                <Image 
-                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-q3G8iA3f_3y2aV-Y-aZgxoLzHqR-5Q&s"
-                    alt="Logo"
-                    width={80}
-                    height={80}
-                    className="rounded-full"
-                />
-            </div>
           <CardTitle>COOP. LA CANDELARIA</CardTitle>
           <CardDescription>
             Introduce el código PIN de 4 dígitos para desbloquear.
