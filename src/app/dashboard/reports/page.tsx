@@ -56,32 +56,40 @@ function PaidPaymentsTab() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-  const paymentsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'payments')) : null),
+  const paidInstallmentsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'installments'), where('status', '==', 'paid')) : null),
     [firestore]
   );
-  const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
+  const { data: paidInstallments, isLoading } = useCollection<Installment>(paidInstallmentsQuery);
 
-  const { filteredPayments, totals } = useMemo(() => {
-    if (!payments) return { filteredPayments: [], totals: { capital: 0, interest: 0, total: 0 } };
+  const partnersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'partners') : null), [firestore]);
+  const { data: partners } = useCollection<Partner>(partnersQuery);
+  const partnersMap = useMemo(() => {
+    if (!partners) return new Map();
+    return new Map(partners.map(p => [p.id, `${p.firstName} ${p.lastName}`]));
+  }, [partners]);
+
+  const { filteredInstallments, totals } = useMemo(() => {
+    if (!paidInstallments) return { filteredInstallments: [], totals: { capital: 0, interest: 0, total: 0 } };
     
-    const filtered = payments.filter(p => {
-      const paymentDate = parseISO(p.paymentDate);
+    const filtered = paidInstallments.filter(inst => {
+      if (!inst.paymentDate) return false;
+      const paymentDate = parseISO(inst.paymentDate);
       return getMonth(paymentDate) === selectedMonth && getYear(paymentDate) === selectedYear;
     });
 
-    const calculatedTotals = filtered.reduce((acc, p) => {
-      acc.capital += p.capitalAmount || 0;
-      acc.interest += p.interestAmount || 0;
-      acc.total += p.totalAmount;
+    const calculatedTotals = filtered.reduce((acc, inst) => {
+      acc.capital += inst.capitalAmount || 0;
+      acc.interest += inst.interestAmount || 0;
+      acc.total += inst.totalAmount;
       return acc;
     }, { capital: 0, interest: 0, total: 0 });
 
     return { 
-      filteredPayments: filtered.sort((a,b) => parseISO(a.paymentDate).getTime() - parseISO(b.paymentDate).getTime()), 
+      filteredInstallments: filtered.sort((a,b) => parseISO(a.paymentDate!).getTime() - parseISO(b.paymentDate!).getTime()), 
       totals: calculatedTotals,
     };
-  }, [payments, selectedMonth, selectedYear]);
+  }, [paidInstallments, selectedMonth, selectedYear]);
 
   return (
     <Card>
@@ -122,32 +130,34 @@ function PaidPaymentsTab() {
             <TableRow>
               <TableHead>Socio</TableHead>
               <TableHead>Fecha de Pago</TableHead>
+              <TableHead># Cuota</TableHead>
               <TableHead className="text-right">Capital Pagado</TableHead>
               <TableHead className="text-right">Interés Pagado</TableHead>
               <TableHead className="text-right">Monto Total Pagado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPayments.map((payment) => (
-              <TableRow key={payment.id}>
-                <TableCell className="font-medium">{payment.partnerName || payment.partnerId}</TableCell>
-                <TableCell>{format(parseISO(payment.paymentDate), 'dd/MM/yyyy')}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.capitalAmount)}</TableCell>
-                <TableCell className="text-right">{currencyFormatter.format(payment.interestAmount)}</TableCell>
-                <TableCell className="text-right font-semibold">{currencyFormatter.format(payment.totalAmount)}</TableCell>
+            {filteredInstallments.map((installment) => (
+              <TableRow key={installment.id}>
+                <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || installment.partnerId}</TableCell>
+                <TableCell>{installment.paymentDate ? format(parseISO(installment.paymentDate), 'dd/MM/yyyy') : '-'}</TableCell>
+                <TableCell>{installment.installmentNumber}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
+                <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
+                <TableCell className="text-right font-semibold">{currencyFormatter.format(installment.totalAmount)}</TableCell>
               </TableRow>
             ))}
-            {filteredPayments.length === 0 && (
+            {filteredInstallments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  No hay pagos para este período.
+                <TableCell colSpan={6} className="h-24 text-center">
+                  No hay cuotas pagadas para este período.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>}
       </CardContent>
-      {!isLoading && filteredPayments.length > 0 && (
+      {!isLoading && filteredInstallments.length > 0 && (
         <CardFooter className="flex-col items-end gap-2">
             <div className="text-lg font-semibold">
                 Total Capital Pagado: {currencyFormatter.format(totals.capital)}
