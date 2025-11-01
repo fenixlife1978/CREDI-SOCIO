@@ -154,4 +154,15 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 140 20% 88%;
-    --input: 140
+    --input: 140 20% 88%;
+    --ring: 150 60% 30%;
+    --sidebar-background: 145 45% 25%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 145 45% 25%;
+    --sidebar-accent: 145 45% 35%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 145 45% 20%;
+    --sidebar-ring: 0 0% 98%;
+  }
+}

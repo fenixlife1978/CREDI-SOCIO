@@ -108,3 +108,5 @@ export function AppSidebar() {
         </SidebarMenu>
       </div>
     </Sidebar>
+  );
+}
