@@ -42,7 +42,7 @@ function AppLogo() {
       <div className="w-10 h-10 flex items-center justify-center bg-sidebar-primary text-sidebar-primary-foreground rounded-md">
         <Landmark />
       </div>
-      <span className="group-data-[collapsible=icon]:hidden">COOP. LA CANDELARIA</span>
+      <span className="group-data-[collapsible=icon]:hidden">Asoc. Coop. Transp. La Candelaria R.L.</span>
     </div>
   );
 }

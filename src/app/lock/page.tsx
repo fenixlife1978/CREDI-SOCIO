@@ -49,7 +49,7 @@ export default function LockPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>COOP. LA CANDELARIA</CardTitle>
+          <CardTitle>Asoc. Coop. Transp. La Candelaria R.L.</CardTitle>
           <CardDescription>
             Introduce el código PIN de 4 dígitos para desbloquear.
           </CardDescription>

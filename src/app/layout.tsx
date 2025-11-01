@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/lib/auth-provider';
 
 export const metadata: Metadata = {
-  title: 'Asociación Cooperativa de Transporte La Candelaria R.L.',
+  title: 'Asoc. Coop. Transp. La Candelaria R.L.',
   description: 'Sistema de Gestión de Préstamos',
 };
 

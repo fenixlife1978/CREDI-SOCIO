@@ -101,7 +101,7 @@ export default function ReceiptPage() {
         <div ref={printRef} className="p-2">
             <Card className="w-full max-w-2xl mx-auto shadow-none border-gray-300 print:shadow-none print:border-none">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-xl">ASOCIACION COOPERATIVA DE TRANSPORTE LA CANDELARIA R.L.</CardTitle>
+                    <CardTitle className="text-xl">Asoc. Coop. Transp. La Candelaria R.L.</CardTitle>
                     <p className="text-2xl font-bold">Recibo de Pago</p>
                 </CardHeader>
                 <CardContent className="space-y-6">
