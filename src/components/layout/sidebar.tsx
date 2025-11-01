@@ -15,7 +15,6 @@ import {
   Landmark,
   DollarSign,
   LogOut,
-  Sun,
   ShieldCheck,
   FileText,
   Receipt,
@@ -94,22 +93,6 @@ export function AppSidebar() {
       </SidebarContent>
       <div className='p-2 mt-auto'>
         <SidebarMenu>
-           <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                href="/dashboard/settings"
-                isActive={pathname === '/dashboard/settings'}
-                icon={<Settings />}
-                 tooltip={{
-                  children: "Ajustes",
-                  className: 'bg-primary text-primary-foreground',
-                }}
-              >
-                <Link href="/dashboard/settings">
-                  <span className="group-data-[collapsible=icon]:hidden">Ajustes</span>
-                </Link>
-              </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
               <SidebarMenuButton
                 onClick={handleLogout}

@@ -16,7 +16,7 @@ interface FirebaseClientProviderProps {
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   // useMemo ensures Firebase app is initialized only once.
-  const { firebaseApp, firestore, storage } = useMemo(() => initializeFirebase(), []);
+  const { firebaseApp, firestore } = useMemo(() => initializeFirebase(), []);
   const [auth, setAuth] = useState<Auth | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,8 +49,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       <FirebaseProvider
         firebaseApp={firebaseApp}
         firestore={firestore}
-        auth={auth} 
-        storage={storage}
+        auth={auth}
       >
         {children}
       </FirebaseProvider>
