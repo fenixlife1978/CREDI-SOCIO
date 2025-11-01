@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   FileText,
   Receipt,
+  Palette,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ const navItems = [
   { href: '/dashboard/receipts', label: 'Recibos', icon: Receipt },
   { href: '/dashboard/reports', label: 'Reportes', icon: FileText },
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldCheck },
+  { href: '/dashboard/settings', label: 'Ajustes', icon: Palette },
 ];
 
 function AppLogo() {
@@ -106,5 +108,3 @@ export function AppSidebar() {
         </SidebarMenu>
       </div>
     </Sidebar>
-  );
-}
