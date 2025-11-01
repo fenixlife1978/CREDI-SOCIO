@@ -12,24 +12,22 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
-  Landmark,
+  Bus,
   DollarSign,
   LogOut,
   ShieldCheck,
   FileText,
   Receipt,
-  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/partners', label: 'Socios', icon: Users },
-  { href: '/dashboard/loans', label: 'Préstamos', icon: Landmark },
+  { href: '/dashboard/loans', label: 'Préstamos', icon: Bus },
   { href: '/dashboard/payments', label: 'Pagos', icon: DollarSign },
   { href: '/dashboard/receipts', label: 'Recibos', icon: Receipt },
   { href: '/dashboard/reports', label: 'Reportes', icon: FileText },
@@ -40,7 +38,7 @@ function AppLogo() {
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
       <div className="w-10 h-10 flex items-center justify-center bg-sidebar-primary text-sidebar-primary-foreground rounded-md">
-        <Landmark />
+        <Bus />
       </div>
       <span className="group-data-[collapsible=icon]:hidden">Asoc. Coop. Transp. La Candelaria R.L.</span>
     </div>
