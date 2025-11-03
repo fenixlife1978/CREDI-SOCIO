@@ -8,10 +8,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Otorga acceso total de lectura y escritura a todos los documentos
-    // para cualquier usuario que haya iniciado sesión.
+    // Otorga acceso total de lectura, escritura, actualización y borrado
+    // a todos los documentos para cualquier usuario que haya iniciado sesión.
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, create, update, delete: if isSignedIn();
     }
   }
 }
