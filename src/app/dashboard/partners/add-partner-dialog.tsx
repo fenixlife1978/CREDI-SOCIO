@@ -24,8 +24,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Loader } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import type { Partner } from '@/lib/data';
 
 const partnerSchema = z.object({
   firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres.'),
@@ -37,47 +38,67 @@ const partnerSchema = z.object({
 type PartnerFormData = z.infer<typeof partnerSchema>;
 
 interface AddPartnerDialogProps {
-    isOpen: boolean;
-    setIsOpen: (isOpen: boolean) => void;
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+  partnerToEdit?: Partner | null;
 }
 
-export function AddPartnerDialog({ isOpen, setIsOpen }: AddPartnerDialogProps) {
+export function AddPartnerDialog({ isOpen, setIsOpen, partnerToEdit }: AddPartnerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditMode = !!partnerToEdit;
   
   const form = useForm<PartnerFormData>({
     resolver: zodResolver(partnerSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      identificationNumber: '',
-      alias: '',
-    },
   });
 
   useEffect(() => {
-    if (!isOpen) {
-      form.reset();
+    if (isOpen) {
+      if (isEditMode && partnerToEdit) {
+        form.reset({
+          firstName: partnerToEdit.firstName,
+          lastName: partnerToEdit.lastName,
+          identificationNumber: partnerToEdit.identificationNumber,
+          alias: partnerToEdit.alias,
+        });
+      } else {
+        form.reset({
+          firstName: '',
+          lastName: '',
+          identificationNumber: '',
+          alias: '',
+        });
+      }
     }
-  }, [isOpen, form]);
+  }, [isOpen, isEditMode, partnerToEdit, form]);
 
   const onSubmit = async (data: PartnerFormData) => {
     if (!firestore) return;
     setIsSubmitting(true);
   
     try {
-      const partnersCollectionRef = collection(firestore, 'partners');
-      await addDoc(partnersCollectionRef, {
-        ...data,
-        identificationNumber: data.identificationNumber || '',
-        alias: data.alias || '',
-      });
-  
-      toast({
-        title: '¡Socio añadido!',
-        description: `El socio ${data.firstName} ${data.lastName} ha sido registrado correctamente.`,
-      });
+      if (isEditMode && partnerToEdit) {
+        // Update existing partner
+        const partnerDocRef = doc(firestore, 'partners', partnerToEdit.id);
+        await updateDoc(partnerDocRef, data);
+        toast({
+          title: '¡Socio actualizado!',
+          description: `La información de ${data.firstName} ${data.lastName} ha sido actualizada.`,
+        });
+      } else {
+        // Create new partner
+        const partnersCollectionRef = collection(firestore, 'partners');
+        await addDoc(partnersCollectionRef, {
+          ...data,
+          identificationNumber: data.identificationNumber || '',
+          alias: data.alias || '',
+        });
+        toast({
+          title: '¡Socio añadido!',
+          description: `El socio ${data.firstName} ${data.lastName} ha sido registrado correctamente.`,
+        });
+      }
   
       form.reset();
       setIsOpen(false);
@@ -85,7 +106,7 @@ export function AddPartnerDialog({ isOpen, setIsOpen }: AddPartnerDialogProps) {
       console.error('Error saving partner:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo guardar el socio. Inténtalo de nuevo.',
+        description: `No se pudo ${isEditMode ? 'actualizar' : 'guardar'} el socio. Inténtalo de nuevo.`,
         variant: 'destructive',
       });
     } finally {
@@ -97,9 +118,9 @@ export function AddPartnerDialog({ isOpen, setIsOpen }: AddPartnerDialogProps) {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Añadir Nuevo Socio</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Editar Socio' : 'Añadir Nuevo Socio'}</DialogTitle>
           <DialogDescription>
-            Completa la información para registrar un nuevo socio en el sistema.
+            {isEditMode ? 'Actualiza la información del socio.' : 'Completa la información para registrar un nuevo socio.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -166,7 +187,7 @@ export function AddPartnerDialog({ isOpen, setIsOpen }: AddPartnerDialogProps) {
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar Socio
+                {isEditMode ? 'Guardar Cambios' : 'Guardar Socio'}
               </Button>
             </DialogFooter>
           </form>

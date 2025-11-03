@@ -4,25 +4,28 @@ import { useRef, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Upload, Trash2, Search } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Upload, Trash2, Search, Pencil, Eye } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, doc, writeBatch, deleteDoc, getDocs, where } from "firebase/firestore";
-import type { Partner, Loan, Installment } from "@/lib/data";
+import type { Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { AddPartnerDialog } from "./add-partner-dialog";
 import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
 
 export default function PartnersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
+  const [partnerToEdit, setPartnerToEdit] = useState<Partner | null>(null);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -132,6 +135,22 @@ export default function PartnersPage() {
     setIsAlertOpen(true);
   };
 
+  const openEditDialog = (partner: Partner) => {
+    setPartnerToEdit(partner);
+    setIsPartnerDialogOpen(true);
+  };
+
+  const openNewDialog = () => {
+    setPartnerToEdit(null);
+    setIsPartnerDialogOpen(true);
+  };
+
+  const handleViewProfile = (partnerId: string) => {
+    // Navigate to the loans page and pass the partnerId as a query parameter
+    // This allows the loans page to filter loans for that specific partner
+    router.push(`/dashboard/loans?partnerId=${partnerId}`);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!partnerToDelete || !firestore) return;
     
@@ -187,7 +206,11 @@ export default function PartnersPage() {
 
   return (
     <>
-      <AddPartnerDialog isOpen={isPartnerDialogOpen} setIsOpen={setIsPartnerDialogOpen} />
+      <AddPartnerDialog 
+        isOpen={isPartnerDialogOpen} 
+        setIsOpen={setIsPartnerDialogOpen} 
+        partnerToEdit={partnerToEdit}
+      />
 
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-2">
@@ -204,7 +227,7 @@ export default function PartnersPage() {
               <Upload className="h-4 w-4 mr-2" />
               {isImporting ? 'Importando...' : 'Importar'}
             </Button>
-            <Button size="sm" onClick={() => setIsPartnerDialogOpen(true)}>
+            <Button size="sm" onClick={openNewDialog}>
               <PlusCircle className="h-4 w-4 mr-2" />
               Añadir Socio
             </Button>
@@ -265,8 +288,14 @@ export default function PartnersPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>                        
-                          <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewProfile(partner.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver Perfil
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditDialog(partner)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => openDeleteDialog(partner)}

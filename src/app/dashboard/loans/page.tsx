@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,7 +17,7 @@ import { AddLoanDialog } from "./add-loan-dialog";
 import * as XLSX from 'xlsx';
 import { format, parseISO, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export default function LoansPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [isClearAllAlertOpen, setIsClearAllAlertOpen] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
@@ -35,6 +36,13 @@ export default function LoansPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    const partnerIdFromQuery = searchParams.get('partnerId');
+    if (partnerIdFromQuery) {
+      setSelectedPartnerId(partnerIdFromQuery);
+    }
+  }, [searchParams]);
 
   const loansQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -331,6 +339,12 @@ export default function LoansPage() {
     };
     reader.readAsArrayBuffer(file);
   };
+
+  const handleClearFilter = () => {
+    setSelectedPartnerId(null);
+    // Remove the query parameter from the URL without reloading the page
+    router.replace('/dashboard/loans', undefined);
+  }
   
   const isLoading = loansLoading || partnersLoading;
 
@@ -421,7 +435,7 @@ export default function LoansPage() {
                 </PopoverContent>
               </Popover>
               {selectedPartnerId && (
-                <Button variant="ghost" size="icon" onClick={() => setSelectedPartnerId(null)}>
+                <Button variant="ghost" size="icon" onClick={handleClearFilter}>
                   <X className="h-4 w-4" />
                   <span className="sr-only">Limpiar filtro</span>
                 </Button>
@@ -549,5 +563,3 @@ export default function LoansPage() {
     </>
   );
 }
-
-    
