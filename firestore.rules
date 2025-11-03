@@ -3,15 +3,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is signed in.
+    // Define una función para verificar si un usuario ha iniciado sesión.
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Default-deny all reads and writes.
-     * All paths below must explicitly grant access.
-     */
+    // Otorga acceso total de lectura y escritura a todos los documentos
+    // para cualquier usuario que haya iniciado sesión.
     match /{document=**} {
       allow read, write: if isSignedIn();
     }
