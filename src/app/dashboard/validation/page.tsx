@@ -7,7 +7,7 @@ import { collection, query, writeBatch, getDocs, where, doc, updateDoc, Firestor
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt, CalendarCheck, RotateCcw } from 'lucide-react';
+import { Loader, ShieldCheck, Wrench, FileText, Edit, Undo2, Receipt, CalendarCheck, RotateCcw, UserCog } from 'lucide-react';
 import type { Installment, Payment, Loan, Partner } from '@/lib/data';
 import { isBefore, startOfToday, parse, isValid, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { es } from 'date-fns/locale';
 import { format } from 'date-fns';
+import { updateUserEmail } from '@/lib/actions';
 
 const months = Array.from({ length: 12 }, (_, i) => ({
   value: i,
@@ -39,6 +40,10 @@ export default function ValidationPage() {
   const [installmentIdToUpdate, setInstallmentIdToUpdate] = useState('');
   const [newPaymentDate, setNewPaymentDate] = useState('');
   const [paymentIdToRevert, setPaymentIdToRevert] = useState('');
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [adminUid, setAdminUid] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+
 
    // State for ranged revert
   const [startMonth, setStartMonth] = useState<number>(new Date().getMonth());
@@ -557,12 +562,61 @@ export default function ValidationPage() {
     }
   };
 
+  const handleUpdateAdminEmail = async () => {
+    if (!adminUid || !newAdminEmail) {
+      toast({ title: 'Error', description: 'Por favor, proporciona el UID y el nuevo correo.', variant: 'destructive' });
+      return;
+    }
+    setIsUpdatingEmail(true);
+    try {
+      const result = await updateUserEmail({ uid: adminUid, newEmail: newAdminEmail });
+      if (result.success) {
+        toast({ title: '¡Éxito!', description: `El correo del administrador ha sido actualizado a ${newAdminEmail}.` });
+        setAdminUid('');
+        setNewAdminEmail('');
+      } else {
+        throw new Error(result.error || 'Ocurrió un error desconocido.');
+      }
+    } catch (error: any) {
+      toast({ title: 'Error al Actualizar Correo', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center">
         <h1 className="font-semibold text-lg md:text-2xl">Validación de Datos</h1>
       </div>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Actualizar Correo de Administrador</CardTitle>
+          <CardDescription>
+            Cambia el correo electrónico de una cuenta de administrador existente. Necesitarás el UID del usuario de Firebase.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-4">
+            <div className="grid w-full max-w-sm items-center gap-1.5">
+                <Label htmlFor="adminUid">UID del Administrador</Label>
+                <Input id="adminUid" type="text" placeholder="Pega el UID del usuario de Firebase" value={adminUid} onChange={(e) => setAdminUid(e.target.value)} />
+            </div>
+             <div className="grid w-full max-w-sm items-center gap-1.5">
+                <Label htmlFor="newAdminEmail">Nuevo Correo Electrónico</Label>
+                <Input id="newAdminEmail" type="email" placeholder="nuevo-admin@ejemplo.com" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} />
+            </div>
+          <Button onClick={handleUpdateAdminEmail} disabled={isUpdatingEmail}>
+            {isUpdatingEmail ? (
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <UserCog className="mr-2 h-4 w-4" />
+            )}
+            {isUpdatingEmail ? 'Actualizando...' : 'Actualizar Correo'}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
