@@ -4,14 +4,9 @@ import { AppSidebar } from '@/components/layout/sidebar';
 import { AppHeader } from '@/components/layout/header';
 import { useAuth as usePinAuth } from '@/lib/auth-provider'; // Renamed to avoid conflict
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { FirebaseClientProvider, initializeFirebase } from '@/firebase';
-import { signInAnonymously, getAuth } from 'firebase/auth';
+import { useEffect } from 'react';
+import { FirebaseClientProvider } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Initialize Firebase once
-const { firebaseApp, firestore } = initializeFirebase();
-const auth = getAuth(firebaseApp);
 
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -24,13 +19,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       router.push('/lock');
     }
   }, [isAuthenticated, router]);
-  
-  useEffect(() => {
-    // Ensure there is an anonymous Firebase user for Firestore rules, run in background
-    if (!auth.currentUser) {
-      signInAnonymously(auth).catch((error) => console.error("Anonymous sign-in failed:", error));
-    }
-  }, []);
 
 
   // While PIN auth is false, show a loading skeleton.
