@@ -8,6 +8,8 @@ import {
   useCollection,
   useFirestore,
   useMemoFirebase,
+  errorEmitter,
+  FirestorePermissionError,
 } from '@/firebase';
 import {
   collection,
@@ -136,11 +138,23 @@ export default function IndividualPayment() {
         const loanRef = doc(firestore, 'loans', loanId);
         const paymentRef = doc(collection(firestore, 'payments'));
         const partner = partners?.find(p => p.id === partnerId);
+        
+        const paymentData = {
+            partnerId: partnerId,
+            loanId: loanId,
+            installmentIds: [], // No specific installment
+            paymentDate: new Date(paymentDate).toISOString(),
+            totalAmount: amount,
+            capitalAmount: amount,
+            interestAmount: 0, 
+            partnerName: partner ? `${partner.firstName} ${partner.lastName}` : partnerId,
+            type: 'individual_contribution' as const
+        };
 
         await runTransaction(firestore, async (transaction) => {
             const loanDoc = await transaction.get(loanRef);
             if (!loanDoc.exists()) {
-                throw "El documento del préstamo no existe.";
+                throw new Error("El documento del préstamo no existe.");
             }
 
             const currentLoanData = loanDoc.data() as Loan;
@@ -149,24 +163,11 @@ export default function IndividualPayment() {
             // 1. Update loan balance
             transaction.update(loanRef, { 
               totalAmount: newBalance,
-              // If the payment covers the full balance, mark as finalized
               status: newBalance <= 0 ? 'Finalizado' : currentLoanData.status
             });
 
             // 2. Create payment record
-            transaction.set(paymentRef, {
-                partnerId: partnerId,
-                loanId: loanId,
-                installmentIds: [], // No specific installment
-                paymentDate: new Date(paymentDate).toISOString(),
-                totalAmount: amount,
-                // For 'abono libre', we can't easily break down capital/interest
-                // without knowing the original calculation method. We can assign it all to capital.
-                capitalAmount: amount,
-                interestAmount: 0, 
-                partnerName: partner ? `${partner.firstName} ${partner.lastName}` : partnerId,
-                type: 'individual_contribution' // Custom type for this payment
-            });
+            transaction.set(paymentRef, paymentData);
         });
 
       toast({
@@ -180,12 +181,18 @@ export default function IndividualPayment() {
         amount: 0,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error registering payment:', error);
+      
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: `loans/${loanId}`,
+        operation: 'write', // runTransaction involves reads and writes
+        requestResourceData: { paymentAmount: amount }
+      }));
+
       toast({
-        title: 'Error',
-        description:
-          'No se pudo registrar el abono. Inténtalo de nuevo.',
+        title: 'Error de Permiso',
+        description: 'No se pudo registrar el abono. Revisa los permisos.',
         variant: 'destructive',
       });
     } finally {

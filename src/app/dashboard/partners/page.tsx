@@ -8,7 +8,7 @@ import { MoreHorizontal, PlusCircle, Upload, Trash2, Search, Pencil, Eye } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollection, useFirestore, useMemoFirebase, FirestorePermissionError, errorEmitter } from "@/firebase";
-import { collection, query, doc, writeBatch, deleteDoc, getDocs, where } from "firebase/firestore";
+import { collection, query, doc, writeBatch, getDocs, where } from "firebase/firestore";
 import type { Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from 'xlsx';
@@ -154,46 +154,45 @@ export default function PartnersPage() {
   const handleDeleteConfirm = async () => {
     if (!partnerToDelete || !firestore) return;
   
+    // 1. Mark partner for deletion
+    const partnerDocRef = doc(firestore, 'partners', partnerToDelete.id);
+  
+    // 2. Find associated loans
+    const loansQuery = query(collection(firestore, 'loans'), where('partnerId', '==', partnerToDelete.id));
+  
+    // 3. Find associated installments
+    const installmentsQuery = query(collection(firestore, 'installments'), where('partnerId', '==', partnerToDelete.id));
+  
     try {
+      const [loansSnapshot, installmentsSnapshot] = await Promise.all([
+        getDocs(loansQuery),
+        getDocs(installmentsQuery),
+      ]);
+  
       const batch = writeBatch(firestore);
   
-      // 1. Mark partner for deletion
-      const partnerDocRef = doc(firestore, 'partners', partnerToDelete.id);
-  
-      // 2. Find associated loans
-      const loansQuery = query(collection(firestore, 'loans'), where('partnerId', '==', partnerToDelete.id));
-      const loansSnapshot = await getDocs(loansQuery);
-      const loanIds = loansSnapshot.docs.map(d => d.id);
-  
-      // 3. Find associated installments
-      if (loanIds.length > 0) {
-        for (let i = 0; i < loanIds.length; i += 30) {
-          const chunkOfLoanIds = loanIds.slice(i, i + 30);
-          const installmentsQuery = query(collection(firestore, 'installments'), where('loanId', 'in', chunkOfLoanIds));
-          const installmentsSnapshot = await getDocs(installmentsQuery);
-          installmentsSnapshot.forEach(installmentDoc => {
-            batch.delete(installmentDoc.ref); // Mark for deletion
-          });
-        }
-      }
-      
       // Mark loans for deletion
-      for (const loanDoc of loansSnapshot.docs) {
+      loansSnapshot.forEach(loanDoc => {
         batch.delete(loanDoc.ref);
-      }
-      
-      // Mark partner for deletion
+      });
+  
+      // Mark installments for deletion
+      installmentsSnapshot.forEach(installmentDoc => {
+        batch.delete(installmentDoc.ref);
+      });
+  
+      // Finally, mark the partner for deletion
       batch.delete(partnerDocRef);
   
-      // 4. Commit all deletions in one batch
+      // Commit all deletions in one batch
       batch.commit()
         .then(() => {
           toast({
             title: "Socio y Datos Eliminados",
-            description: `El socio ${partnerToDelete.firstName} ${partnerToDelete.lastName} y todos sus préstamos y cuotas han sido eliminados.`,
+            description: `El socio ${partnerToDelete.firstName} ${partnerToDelete.lastName} y todos sus datos asociados han sido eliminados.`,
           });
         })
-        .catch((serverError) => {
+        .catch(async (serverError) => {
           console.error("Error deleting partner and associated data: ", serverError);
           // Emit a contextual error for better debugging.
           errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -202,7 +201,7 @@ export default function PartnersPage() {
           }));
           toast({
             title: "Error al eliminar",
-            description: "No se pudo eliminar el socio y sus datos asociados. Inténtalo de nuevo.",
+            description: "No se pudo eliminar el socio y sus datos asociados. Revisa los permisos.",
             variant: "destructive",
           });
         });
@@ -212,7 +211,7 @@ export default function PartnersPage() {
       console.error("Error fetching data for deletion: ", error);
       toast({
         title: "Error de Preparación",
-        description: "No se pudieron obtener los datos necesarios para la eliminación. Revisa tu conexión.",
+        description: "No se pudieron obtener los datos necesarios para la eliminación. Revisa tu conexión y permisos de lectura.",
         variant: "destructive",
       });
     } finally {

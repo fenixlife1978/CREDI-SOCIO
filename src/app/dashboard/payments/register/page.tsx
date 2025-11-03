@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, where, writeBatch, getDocs, doc } from 'firebase/firestore';
 import type { Installment, Partner, Loan } from '@/lib/data';
 import { getMonth, getYear, parseISO, format, set, isBefore, startOfDay } from 'date-fns';
@@ -242,107 +242,124 @@ export default function RegisterPaymentPage() {
 
     setIsProcessing(true);
 
+    const batch = writeBatch(firestore);
+    const installmentsToUpdate = installments.filter(inst => installmentIdsToProcess.includes(inst.id));
+
+    const paymentsByLoan: Record<string, any> = {};
+    const loanStatusCheck: Record<string, boolean> = {};
+
+    for (const inst of installmentsToUpdate) {
+      const partner = partners.find(p => p.id === inst.partnerId);
+      const originalDueDate = parseISO(inst.dueDate);
+      const paymentDate = set(originalDueDate, {
+          month: selectedMonth,
+          year: selectedYear
+      }).toISOString();
+
+      if (!paymentsByLoan[inst.loanId]) {
+          const paymentRef = doc(collection(firestore, 'payments'));
+          paymentsByLoan[inst.loanId] = {
+              ref: paymentRef,
+              partnerId: inst.partnerId,
+              loanId: inst.loanId,
+              installmentIds: [],
+              totalAmount: 0,
+              capitalAmount: 0,
+              interestAmount: 0,
+              paymentDate,
+              partnerName: partnersMap.get(inst.partnerId) || inst.partnerId,
+          };
+      }
+
+      paymentsByLoan[inst.loanId].installmentIds.push(inst.id);
+      paymentsByLoan[inst.loanId].totalAmount += inst.totalAmount;
+      paymentsByLoan[inst.loanId].capitalAmount += inst.capitalAmount;
+      paymentsByLoan[inst.loanId].interestAmount += inst.interestAmount;
+      
+      const receiptRef = doc(collection(firestore, 'receipts'));
+      batch.set(receiptRef, {
+          type: 'installment_payment',
+          partnerId: inst.partnerId,
+          loanId: inst.loanId,
+          paymentId: paymentsByLoan[inst.loanId].ref.id,
+          installmentId: inst.id,
+          generationDate: new Date().toISOString(),
+          amount: inst.totalAmount,
+          partnerName: partner ? `${partner.firstName} ${partner.lastName}` : inst.partnerId,
+          partnerIdentification: partner?.identificationNumber || '',
+          installmentDetails: {
+              installmentNumber: inst.installmentNumber,
+              capitalAmount: inst.capitalAmount,
+              interestAmount: inst.interestAmount,
+          },
+      });
+
+      const installmentRef = doc(firestore, 'installments', inst.id);
+      batch.update(installmentRef, { 
+          status: 'paid', 
+          paymentDate, 
+          paymentId: paymentsByLoan[inst.loanId].ref.id,
+          receiptId: receiptRef.id,
+      });
+
+      loanStatusCheck[inst.loanId] = true;
+    }
+    
+    for(const loanId in paymentsByLoan) {
+        const { ref, ...paymentData } = paymentsByLoan[loanId];
+        batch.set(ref, paymentData);
+    }
+
     try {
-      const batch = writeBatch(firestore);
-      const installmentsToUpdate = installments.filter(inst => installmentIdsToProcess.includes(inst.id));
+        for (const loanId of Object.keys(loanStatusCheck)) {
+            const allInstallmentsForLoanQuery = query(collection(firestore, 'installments'), where('loanId', '==', loanId));
+            const allInstallmentsForLoanSnapshot = await getDocs(allInstallmentsForLoanQuery);
 
-      const paymentsByLoan: Record<string, any> = {};
-      const loanStatusCheck: Record<string, boolean> = {};
-
-      for (const inst of installmentsToUpdate) {
-        const partner = partners.find(p => p.id === inst.partnerId);
-        const originalDueDate = parseISO(inst.dueDate);
-        const paymentDate = set(originalDueDate, {
-            month: selectedMonth,
-            year: selectedYear
-        }).toISOString();
-
-        if (!paymentsByLoan[inst.loanId]) {
-            const paymentRef = doc(collection(firestore, 'payments'));
-            paymentsByLoan[inst.loanId] = {
-                ref: paymentRef,
-                partnerId: inst.partnerId,
-                loanId: inst.loanId,
-                installmentIds: [],
-                totalAmount: 0,
-                capitalAmount: 0,
-                interestAmount: 0,
-                paymentDate,
-                partnerName: partnersMap.get(inst.partnerId) || inst.partnerId,
-            };
+            const allPaid = allInstallmentsForLoanSnapshot.docs.every(docSnap => {
+                const installmentId = docSnap.id;
+                if (installmentIdsToProcess.includes(installmentId)) return true;
+                return docSnap.data().status === 'paid';
+            });
+            
+            if (allPaid) {
+                const loanRef = doc(firestore, 'loans', loanId);
+                batch.update(loanRef, { status: 'Finalizado' });
+            }
         }
 
-        paymentsByLoan[inst.loanId].installmentIds.push(inst.id);
-        paymentsByLoan[inst.loanId].totalAmount += inst.totalAmount;
-        paymentsByLoan[inst.loanId].capitalAmount += inst.capitalAmount;
-        paymentsByLoan[inst.loanId].interestAmount += inst.interestAmount;
-        
-        const receiptRef = doc(collection(firestore, 'receipts'));
-        batch.set(receiptRef, {
-            type: 'installment_payment',
-            partnerId: inst.partnerId,
-            loanId: inst.loanId,
-            paymentId: paymentsByLoan[inst.loanId].ref.id,
-            installmentId: inst.id,
-            generationDate: new Date().toISOString(),
-            amount: inst.totalAmount,
-            partnerName: partner ? `${partner.firstName} ${partner.lastName}` : inst.partnerId,
-            partnerIdentification: partner?.identificationNumber || '',
-            installmentDetails: {
-                installmentNumber: inst.installmentNumber,
-                capitalAmount: inst.capitalAmount,
-                interestAmount: inst.interestAmount,
-            },
-        });
-
-        const installmentRef = doc(firestore, 'installments', inst.id);
-        batch.update(installmentRef, { 
-            status: 'paid', 
-            paymentDate, 
-            paymentId: paymentsByLoan[inst.loanId].ref.id,
-            receiptId: receiptRef.id,
-        });
-
-        loanStatusCheck[inst.loanId] = true;
-      }
-      
-      for(const loanId in paymentsByLoan) {
-          const { ref, ...paymentData } = paymentsByLoan[loanId];
-          batch.set(ref, paymentData);
-      }
-
-      for (const loanId of Object.keys(loanStatusCheck)) {
-          const allInstallmentsForLoanQuery = query(collection(firestore, 'installments'), where('loanId', '==', loanId));
-          const allInstallmentsForLoanSnapshot = await getDocs(allInstallmentsForLoanQuery);
-
-          const allPaid = allInstallmentsForLoanSnapshot.docs.every(docSnap => {
-              const installmentId = docSnap.id;
-              if (installmentIdsToProcess.includes(installmentId)) return true;
-              return docSnap.data().status === 'paid';
+        batch.commit()
+          .then(() => {
+            toast({
+              title: "¡Pagos Procesados!",
+              description: `${installmentsToUpdate.length} cuota(s) han sido marcadas como pagadas y sus recibos generados.`,
+            });
+            setSelectedInstallments({}); // Clear selection
+          })
+          .catch(async (serverError) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: 'payments/', // Representative path for batch write
+              operation: 'write',
+              requestResourceData: { 
+                payments: Object.values(paymentsByLoan).length,
+                installments: installmentsToUpdate.length 
+              },
+            }));
+             toast({
+              title: "Error al Procesar Pagos",
+              description: "Ocurrió un error de permisos. Inténtalo de nuevo.",
+              variant: "destructive",
+            });
           });
-          
-          if (allPaid) {
-              const loanRef = doc(firestore, 'loans', loanId);
-              batch.update(loanRef, { status: 'Finalizado' });
-          }
-      }
 
-      await batch.commit();
-
-      toast({
-        title: "¡Pagos Procesados!",
-        description: `${installmentsToUpdate.length} cuota(s) han sido marcadas como pagadas y sus recibos generados.`,
-      });
-      setSelectedInstallments({}); // Clear selection
-    } catch (error) {
-      console.error("Error processing payments:", error);
-      toast({
-        title: "Error al Procesar Pagos",
-        description: "Ocurrió un error. Inténtalo de nuevo.",
-        variant: "destructive",
-      });
+    } catch(error) {
+        console.error("Error processing payments (getDocs stage):", error);
+        toast({
+            title: "Error al Consultar Datos",
+            description: "No se pudieron verificar todas las cuotas del préstamo.",
+            variant: "destructive",
+        });
     } finally {
-      setIsProcessing(false);
+        setIsProcessing(false);
     }
   };
 
@@ -417,31 +434,35 @@ export default function RegisterPaymentPage() {
 
     setIsClosingMonth(true);
 
-    try {
-      const batch = writeBatch(firestore);
-      unpaidCurrentMonthInstallments.forEach(inst => {
-        const installmentRef = doc(firestore, 'installments', inst.id);
-        batch.update(installmentRef, { status: 'overdue' });
-      });
+    const batch = writeBatch(firestore);
+    unpaidCurrentMonthInstallments.forEach(inst => {
+      const installmentRef = doc(firestore, 'installments', inst.id);
+      batch.update(installmentRef, { status: 'overdue' });
+    });
 
-      await batch.commit();
-
-      toast({
-        title: '¡Mes Cerrado!',
-        description: `${unpaidCurrentMonthInstallments.length} cuota(s) no pagada(s) se marcaron como atrasadas.`,
+    batch.commit()
+      .then(() => {
+        toast({
+          title: '¡Mes Cerrado!',
+          description: `${unpaidCurrentMonthInstallments.length} cuota(s) no pagada(s) se marcaron como atrasadas.`,
+        });
+      })
+      .catch(async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: 'installments/',
+          operation: 'update',
+          requestResourceData: { closingMonth: true, count: unpaidCurrentMonthInstallments.length }
+        }));
+        toast({
+          title: 'Error al Cerrar el Mes',
+          description: 'Ocurrió un error de permisos. Inténtalo de nuevo.',
+          variant: 'destructive',
+        });
+      })
+      .finally(() => {
+        setIsClosingMonth(false);
+        setIsCloseMonthAlertOpen(false);
       });
-
-    } catch (error) {
-      console.error("Error closing month:", error);
-      toast({
-        title: 'Error al Cerrar el Mes',
-        description: 'Ocurrió un error. Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsClosingMonth(false);
-      setIsCloseMonthAlertOpen(false);
-    }
   };
 
   const currencyFormatter = new Intl.NumberFormat('es-CO', {

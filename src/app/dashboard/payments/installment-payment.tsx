@@ -8,6 +8,8 @@ import {
   useCollection,
   useFirestore,
   useMemoFirebase,
+  errorEmitter,
+  FirestorePermissionError,
 } from '@/firebase';
 import {
   collection,
@@ -169,93 +171,101 @@ export default function InstallmentPayment() {
     const totalInterest = installmentsToPay.reduce((sum, inst) => sum + inst.interestAmount, 0);
     const partner = partners?.find(p => p.id === data.partnerId);
 
-    try {
-      const batch = writeBatch(firestore);
-      const paymentRef = doc(collection(firestore, 'payments'));
-      
-      // 1. Create one payment record for the whole transaction
-      batch.set(paymentRef, {
-        partnerId: data.partnerId,
-        loanId: data.loanId,
-        installmentIds: data.selectedInstallmentIds,
-        paymentDate: new Date(data.paymentDate).toISOString(),
-        totalAmount: totalAmount,
-        capitalAmount: totalCapital,
-        interestAmount: totalInterest,
-        partnerName: partner ? `${partner.firstName} ${partner.lastName}` : data.partnerId,
-        type: 'installment_payment'
+    const batch = writeBatch(firestore);
+    const paymentRef = doc(collection(firestore, 'payments'));
+    
+    const paymentData = {
+      partnerId: data.partnerId,
+      loanId: data.loanId,
+      installmentIds: data.selectedInstallmentIds,
+      paymentDate: new Date(data.paymentDate).toISOString(),
+      totalAmount: totalAmount,
+      capitalAmount: totalCapital,
+      interestAmount: totalInterest,
+      partnerName: partner ? `${partner.firstName} ${partner.lastName}` : data.partnerId,
+      type: 'installment_payment' as const
+    };
+    // 1. Create one payment record for the whole transaction
+    batch.set(paymentRef, paymentData);
+
+    // 2. Update status of each paid installment and create receipts
+    for (const inst of installmentsToPay) {
+      const installmentRef = doc(firestore, 'installments', inst.id);
+      const receiptRef = doc(collection(firestore, 'receipts'));
+
+      // Create receipt
+      batch.set(receiptRef, {
+          type: 'installment_payment',
+          partnerId: inst.partnerId,
+          loanId: inst.loanId,
+          paymentId: paymentRef.id,
+          installmentId: inst.id,
+          generationDate: new Date().toISOString(),
+          amount: inst.totalAmount,
+          partnerName: partner ? `${partner.firstName} ${partner.lastName}` : data.partnerId,
+          partnerIdentification: partner?.identificationNumber || '',
+          installmentDetails: {
+              installmentNumber: inst.installmentNumber,
+              capitalAmount: inst.capitalAmount,
+              interestAmount: inst.interestAmount,
+          },
       });
 
-      // 2. Update status of each paid installment and create receipts
-      for (const inst of installmentsToPay) {
-        const installmentRef = doc(firestore, 'installments', inst.id);
-        const receiptRef = doc(collection(firestore, 'receipts'));
-
-        // Create receipt
-        batch.set(receiptRef, {
-            type: 'installment_payment',
-            partnerId: inst.partnerId,
-            loanId: inst.loanId,
-            paymentId: paymentRef.id,
-            installmentId: inst.id,
-            generationDate: new Date().toISOString(),
-            amount: inst.totalAmount,
-            partnerName: partner ? `${partner.firstName} ${partner.lastName}` : data.partnerId,
-            partnerIdentification: partner?.identificationNumber || '',
-            installmentDetails: {
-                installmentNumber: inst.installmentNumber,
-                capitalAmount: inst.capitalAmount,
-                interestAmount: inst.interestAmount,
-            },
-        });
-
-        // Update installment
-        batch.update(installmentRef, { 
-            status: 'paid', 
-            paymentDate: new Date(data.paymentDate).toISOString(),
-            paymentId: paymentRef.id,
-            receiptId: receiptRef.id,
-        });
-      }
-
-      // 3. Check if the entire loan is now paid off
-      const allInstallmentsForLoanQuery = query(collection(firestore, 'installments'), where('loanId', '==', data.loanId));
-      const allInstallmentsSnapshot = await getDocs(allInstallmentsForLoanQuery);
-      const allDocs = allInstallmentsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-
-      const isLoanComplete = allDocs.every(
-        inst => inst.status === 'paid' || data.selectedInstallmentIds.includes(inst.id)
-      );
-
-      if (isLoanComplete) {
-        const loanRef = doc(firestore, 'loans', data.loanId);
-        batch.update(loanRef, { status: 'Finalizado' });
-      }
-
-      await batch.commit();
-
-      toast({
-        title: '¡Pago Registrado!',
-        description: `Se registró un pago de ${currencyFormatter.format(totalAmount)} cubriendo ${installmentsToPay.length} cuota(s) y se generaron los recibos.`,
+      // Update installment
+      batch.update(installmentRef, { 
+          status: 'paid', 
+          paymentDate: new Date(data.paymentDate).toISOString(),
+          paymentId: paymentRef.id,
+          receiptId: receiptRef.id,
       });
-      
-      form.reset({
-        paymentDate: format(new Date(), 'yyyy-MM-dd'),
-        partnerId: data.partnerId,
-        loanId: data.loanId,
-        selectedInstallmentIds: [],
-      });
-
-    } catch (error) {
-      console.error('Error registering payment:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo registrar el pago. Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
     }
+
+    // 3. Check if the entire loan is now paid off
+    const allInstallmentsForLoanQuery = query(collection(firestore, 'installments'), where('loanId', '==', data.loanId));
+    
+    getDocs(allInstallmentsForLoanQuery)
+      .then(allInstallmentsSnapshot => {
+        const allDocs = allInstallmentsSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+
+        const isLoanComplete = allDocs.every(
+          inst => inst.status === 'paid' || data.selectedInstallmentIds.includes(inst.id)
+        );
+
+        if (isLoanComplete) {
+          const loanRef = doc(firestore, 'loans', data.loanId);
+          batch.update(loanRef, { status: 'Finalizado' });
+        }
+
+        return batch.commit();
+      })
+      .then(() => {
+        toast({
+          title: '¡Pago Registrado!',
+          description: `Se registró un pago de ${currencyFormatter.format(totalAmount)} cubriendo ${installmentsToPay.length} cuota(s) y se generaron los recibos.`,
+        });
+        
+        form.reset({
+          paymentDate: format(new Date(), 'yyyy-MM-dd'),
+          partnerId: data.partnerId,
+          loanId: data.loanId,
+          selectedInstallmentIds: [],
+        });
+      })
+      .catch(async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: `payments/${paymentRef.id}`, // Representative path
+          operation: 'write',
+          requestResourceData: paymentData,
+        }));
+        toast({
+          title: 'Error de Permiso',
+          description: 'No se pudo registrar el pago. Revisa los permisos.',
+          variant: 'destructive',
+        });
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
   
   return (

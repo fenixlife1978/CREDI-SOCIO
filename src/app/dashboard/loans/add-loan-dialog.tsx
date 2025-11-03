@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Loader, Check, ChevronsUpDown } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import type { Partner, Loan } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -126,110 +126,134 @@ export function AddLoanDialog({ isOpen, setIsOpen, loanToEdit }: AddLoanDialogPr
   const onSubmit = async (data: LoanFormData) => {
     if (!firestore) return;
     setIsSubmitting(true);
-  
-    try {
-        const [year, month, day] = data.startDate.split('-').map(Number);
-        const startDate = new Date(year, month - 1, day);
 
-      if (isEditMode && loanToEdit) {
-        // Update existing loan
-        const loanDocRef = doc(firestore, 'loans', loanToEdit.id);
-        const selectedPartner = partners?.find(p => p.id === data.partnerId);
+    const [year, month, day] = data.startDate.split('-').map(Number);
+    const startDate = new Date(year, month - 1, day);
 
-        const loanData: Partial<Loan> = {
-            partnerId: data.partnerId,
-            loanType: data.loanType,
-            totalAmount: data.totalAmount,
-            startDate: startDate.toISOString(),
-            partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
-            numberOfInstallments: data.numberOfInstallments ?? 0,
-            interestRate: data.interestRate ?? 0,
-            fixedInterestAmount: data.fixedInterestAmount ?? null,
-        };
+    if (isEditMode && loanToEdit) {
+      // Update existing loan
+      const loanDocRef = doc(firestore, 'loans', loanToEdit.id);
+      const selectedPartner = partners?.find(p => p.id === data.partnerId);
 
-        await updateDoc(loanDocRef, loanData);
-        toast({
-            title: '¡Éxito!',
-            description: 'El préstamo ha sido actualizado correctamente.',
-        });
-
-      } else {
-        // Create new loan
-        const selectedPartner = partners?.find(p => p.id === data.partnerId);
-        const batch = writeBatch(firestore);
-    
-        const loanCollectionRef = collection(firestore, 'loans');
-        const loanDocRef = doc(loanCollectionRef);
-        
-        const loanData: Omit<Loan, 'id'> = {
+      const loanData: Partial<Loan> = {
           partnerId: data.partnerId,
           loanType: data.loanType,
           totalAmount: data.totalAmount,
           startDate: startDate.toISOString(),
           partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
-          status: 'Active',
           numberOfInstallments: data.numberOfInstallments ?? 0,
           interestRate: data.interestRate ?? 0,
-          fixedInterestAmount: data.loanType === 'custom' ? data.fixedInterestAmount ?? 0 : null,
-        };
-        batch.set(loanDocRef, loanData);
-    
-        const installmentsRef = collection(firestore, 'installments');
-        const termDuration = data.loanType === 'standard' || (data.loanType === 'custom' && data.hasTerm === 'yes') 
-          ? data.numberOfInstallments
-          : 0;
+          fixedInterestAmount: data.fixedInterestAmount ?? null,
+      };
 
-        if (termDuration && termDuration > 0) {
-          const capitalPerInstallment = data.totalAmount / termDuration;
-          let remainingBalance = data.totalAmount;
-          
-          for (let i = 1; i <= termDuration; i++) {
-              let interestForInstallment = 0;
-              if (data.loanType === 'standard' && data.interestRate) {
-                  // Calculate interest on the remaining balance
-                  interestForInstallment = remainingBalance * (data.interestRate / 100);
-              } else if (data.loanType === 'custom') {
-                  interestForInstallment = data.fixedInterestAmount || 0;
-              }
-
-              const installmentTotal = capitalPerInstallment + interestForInstallment;
-              const installmentDocRef = doc(installmentsRef);
-              const dueDate = addMonths(startDate, i);
-
-              batch.set(installmentDocRef, {
-                  loanId: loanDocRef.id,
-                  partnerId: data.partnerId,
-                  installmentNumber: i,
-                  dueDate: dueDate.toISOString(),
-                  status: 'pending',
-                  capitalAmount: capitalPerInstallment,
-                  interestAmount: interestForInstallment,
-                  totalAmount: installmentTotal,
-              });
-
-              // Update remaining balance for the next iteration
-              remainingBalance -= capitalPerInstallment;
-          }
-        }
-        await batch.commit();
-    
-        toast({
-          title: '¡Éxito!',
-          description: 'El préstamo y sus cuotas han sido añadidos correctamente.',
+      updateDoc(loanDocRef, loanData)
+        .then(() => {
+          toast({
+              title: '¡Éxito!',
+              description: 'El préstamo ha sido actualizado correctamente.',
+          });
+          form.reset();
+          setIsOpen(false);
+        })
+        .catch(async (serverError) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: loanDocRef.path,
+            operation: 'update',
+            requestResourceData: loanData
+          }));
+          toast({
+            title: 'Error de Permiso',
+            description: 'No se pudo actualizar el préstamo.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => {
+          setIsSubmitting(false);
         });
-      }
+
+    } else {
+      // Create new loan
+      const selectedPartner = partners?.find(p => p.id === data.partnerId);
+      const batch = writeBatch(firestore);
   
-      form.reset();
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Error saving loan:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo guardar el préstamo. Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
+      const loanCollectionRef = collection(firestore, 'loans');
+      const loanDocRef = doc(loanCollectionRef);
+      
+      const loanData: Omit<Loan, 'id'> = {
+        partnerId: data.partnerId,
+        loanType: data.loanType,
+        totalAmount: data.totalAmount,
+        startDate: startDate.toISOString(),
+        partnerName: selectedPartner ? `${selectedPartner.firstName} ${selectedPartner.lastName}` : data.partnerId,
+        status: 'Active',
+        numberOfInstallments: data.numberOfInstallments ?? 0,
+        interestRate: data.interestRate ?? 0,
+        fixedInterestAmount: data.loanType === 'custom' ? data.fixedInterestAmount ?? 0 : null,
+      };
+      batch.set(loanDocRef, loanData);
+  
+      const installmentsRef = collection(firestore, 'installments');
+      const termDuration = data.loanType === 'standard' || (data.loanType === 'custom' && data.hasTerm === 'yes') 
+        ? data.numberOfInstallments
+        : 0;
+
+      if (termDuration && termDuration > 0) {
+        const capitalPerInstallment = data.totalAmount / termDuration;
+        let remainingBalance = data.totalAmount;
+        
+        for (let i = 1; i <= termDuration; i++) {
+            let interestForInstallment = 0;
+            if (data.loanType === 'standard' && data.interestRate) {
+                // Calculate interest on the remaining balance
+                interestForInstallment = remainingBalance * (data.interestRate / 100);
+            } else if (data.loanType === 'custom') {
+                interestForInstallment = data.fixedInterestAmount || 0;
+            }
+
+            const installmentTotal = capitalPerInstallment + interestForInstallment;
+            const installmentDocRef = doc(installmentsRef);
+            const dueDate = addMonths(startDate, i);
+
+            batch.set(installmentDocRef, {
+                loanId: loanDocRef.id,
+                partnerId: data.partnerId,
+                installmentNumber: i,
+                dueDate: dueDate.toISOString(),
+                status: 'pending',
+                capitalAmount: capitalPerInstallment,
+                interestAmount: interestForInstallment,
+                totalAmount: installmentTotal,
+            });
+
+            // Update remaining balance for the next iteration
+            remainingBalance -= capitalPerInstallment;
+        }
+      }
+      
+      batch.commit()
+        .then(() => {
+          toast({
+            title: '¡Éxito!',
+            description: 'El préstamo y sus cuotas han sido añadidos correctamente.',
+          });
+          form.reset();
+          setIsOpen(false);
+        })
+        .catch(async (serverError) => {
+           errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: `loans/${loanDocRef.id}`, // Representative path for the batch
+            operation: 'create',
+            requestResourceData: { loan: loanData, installmentsCount: termDuration },
+          }));
+          toast({
+            title: 'Error de Permiso',
+            description: 'No se pudo guardar el préstamo y sus cuotas.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => {
+           setIsSubmitting(false);
+        });
     }
   };
 

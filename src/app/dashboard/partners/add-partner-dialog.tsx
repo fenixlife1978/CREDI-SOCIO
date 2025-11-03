@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Loader } from 'lucide-react';
-import { useFirestore } from '@/firebase';
+import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Partner } from '@/lib/data';
@@ -77,40 +77,66 @@ export function AddPartnerDialog({ isOpen, setIsOpen, partnerToEdit }: AddPartne
     if (!firestore) return;
     setIsSubmitting(true);
   
-    try {
-      if (isEditMode && partnerToEdit) {
-        // Update existing partner
-        const partnerDocRef = doc(firestore, 'partners', partnerToEdit.id);
-        await updateDoc(partnerDocRef, data);
-        toast({
-          title: '¡Socio actualizado!',
-          description: `La información de ${data.firstName} ${data.lastName} ha sido actualizada.`,
+    if (isEditMode && partnerToEdit) {
+      // Update existing partner
+      const partnerDocRef = doc(firestore, 'partners', partnerToEdit.id);
+      updateDoc(partnerDocRef, data)
+        .then(() => {
+          toast({
+            title: '¡Socio actualizado!',
+            description: `La información de ${data.firstName} ${data.lastName} ha sido actualizada.`,
+          });
+          form.reset();
+          setIsOpen(false);
+        })
+        .catch(async (serverError) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: partnerDocRef.path,
+            operation: 'update',
+            requestResourceData: data,
+          }));
+          toast({
+            title: 'Error de Permiso',
+            description: 'No se pudo actualizar el socio. Revisa los permisos.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => {
+          setIsSubmitting(false);
         });
-      } else {
-        // Create new partner
-        const partnersCollectionRef = collection(firestore, 'partners');
-        await addDoc(partnersCollectionRef, {
+
+    } else {
+      // Create new partner
+      const partnersCollectionRef = collection(firestore, 'partners');
+      const partnerData = {
           ...data,
           identificationNumber: data.identificationNumber || '',
           alias: data.alias || '',
+      };
+      addDoc(partnersCollectionRef, partnerData)
+        .then(() => {
+          toast({
+            title: '¡Socio añadido!',
+            description: `El socio ${data.firstName} ${data.lastName} ha sido registrado correctamente.`,
+          });
+          form.reset();
+          setIsOpen(false);
+        })
+        .catch(async (serverError) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: partnersCollectionRef.path,
+            operation: 'create',
+            requestResourceData: partnerData,
+          }));
+           toast({
+            title: 'Error de Permiso',
+            description: 'No se pudo crear el socio. Revisa los permisos.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => {
+          setIsSubmitting(false);
         });
-        toast({
-          title: '¡Socio añadido!',
-          description: `El socio ${data.firstName} ${data.lastName} ha sido registrado correctamente.`,
-        });
-      }
-  
-      form.reset();
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Error saving partner:', error);
-      toast({
-        title: 'Error',
-        description: `No se pudo ${isEditMode ? 'actualizar' : 'guardar'} el socio. Inténtalo de nuevo.`,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
