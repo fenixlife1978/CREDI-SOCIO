@@ -127,6 +127,12 @@ export default function LoginPage() {
                 {isSubmitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </Button>
+               <p className="text-center text-sm text-muted-foreground">
+                ¿No tienes una cuenta?{' '}
+                <Link href="/register" className="underline underline-offset-4 hover:text-primary">
+                  Regístrate ahora
+                </Link>
+              </p>
             </CardFooter>
           </form>
         </Form>
