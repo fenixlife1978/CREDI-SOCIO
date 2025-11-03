@@ -1,95 +1,19 @@
 
-/**
- * @fileOverview Firestore Security Rules for the lending system application.
- *
- * Core Philosophy:
- * This ruleset adopts a public read model, with writes restricted to authenticated users
- * and validated against data ownership. The 'owner' of most documents is the 'partner'.
- *
- * Data Structure:
- * - /partners/{partnerId}: Stores information about each lending partner.
- * - /loans/{loanId}: Stores loan details. `ownerId` should match the `partnerId`.
- * - /installments/{installmentId}: Loan installments. `ownerId` should match the `partnerId`.
- * - /payments/{paymentId}: Payment records. `ownerId` should match the `partnerId`.
- * - /receipts/{receiptId}: Payment receipts. `ownerId` should match the `partnerId`.
- * - /reports/{reportId}: Financial reports, publicly readable.
- *
- * Key Security Decisions:
- * - Unauthenticated users can read all data to allow for flexible reporting and viewing.
- * - All write operations (create, update, delete) require user authentication.
- * - Data-level ownership is enforced for writes using the `partnerId` as the owner identifier.
- *   This ensures that operations on loans, installments, etc., are consistent with the partner they belong to.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Grants public read access to partner information.
-     * Creation is allowed for any authenticated user.
-     * Updates and deletes are restricted to the partner themselves (owner).
-     */
-    match /partners/{partnerId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      // Only the partner can update or delete their own document.
-      allow update, delete: if isSignedIn() && request.auth.uid == partnerId;
-    }
-
-    /**
-     * @description Grants public read access to loan information.
-     * Writes are restricted to ensure data integrity and ownership.
-     */
-    match /loans/{loanId} {
-      allow get, list: if true;
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Grants public read access to installment information.
-     * Writes are restricted.
-     */
-    match /installments/{installmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Grants public read access to payment information.
-     * Writes are restricted.
-     */
-    match /payments/{paymentId} {
-      allow get, list: if true;
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Grants public read access to receipt information.
-     * Writes are restricted.
-     */
-    match /receipts/{receiptId} {
-      allow get, list: if true;
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Grants public read access to report information.
-     * Writes are restricted to authenticated users.
-     */
-    match /reports/{reportId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Checks if the user is authenticated.
-     * @returns {boolean} True if a user is signed in.
-     */
+    // Helper function to check if a user is signed in.
     function isSignedIn() {
       return request.auth != null;
     }
+
+    /**
+     * Default-deny all reads and writes.
+     * All paths below must explicitly grant access.
+     */
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
   }
 }
-
-    

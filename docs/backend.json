@@ -301,7 +301,7 @@
   },
   "auth": {
     "providers": [
-      "anonymous"
+      "email_password"
     ]
   },
   "firestore": {
@@ -343,5 +343,3 @@
     }
   }
 }
-
-    

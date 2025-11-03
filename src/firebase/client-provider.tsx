@@ -3,7 +3,7 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -16,13 +16,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   
   const auth = useMemo(() => {
     if (firebaseServices) {
-      const auth = getAuth(firebaseServices.firebaseApp);
-      onAuthStateChanged(auth, (user) => {
-        if (!user) {
-          signInAnonymously(auth);
-        }
-      });
-      return auth;
+      return getAuth(firebaseServices.firebaseApp);
     }
     return null;
   }, [firebaseServices]);

@@ -2,16 +2,17 @@
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Bell, User, LogOut } from "lucide-react"
-import { useAuth } from "@/lib/auth-provider"
+import { useAuth } from "@/firebase"
 import { useRouter } from "next/navigation"
+import { signOut } from "firebase/auth"
 
 export function AppHeader() {
-  const { logout } = useAuth();
+  const auth = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
-    router.push('/lock');
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
   }
 
   return (

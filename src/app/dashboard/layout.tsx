@@ -2,27 +2,26 @@
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/sidebar';
 import { AppHeader } from '@/components/layout/header';
-import { useAuth as usePinAuth } from '@/lib/auth-provider'; // Renamed to avoid conflict
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider, useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = usePinAuth();
+  const { user, isLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    // If the user is not authenticated with the PIN, redirect to lock screen
-    if (!isAuthenticated) {
-      router.push('/lock');
+    // If loading is finished and there's no user, redirect to login
+    if (!isLoading && !user) {
+      router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isLoading, user, router]);
 
 
-  // While PIN auth is false, show a loading skeleton.
-  if (!isAuthenticated) {
+  // While checking for user, show a loading skeleton.
+  if (isLoading || !user) {
     return (
        <div className="flex h-screen w-screen">
           <div className="hidden md:block md:w-64 bg-sidebar p-4">

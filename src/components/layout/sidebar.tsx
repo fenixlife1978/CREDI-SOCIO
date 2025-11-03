@@ -8,7 +8,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
@@ -18,12 +18,12 @@ import {
   ShieldCheck,
   FileText,
   Receipt,
-  Settings, // Import Settings icon
+  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth-provider';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -33,7 +33,7 @@ const navItems = [
   { href: '/dashboard/receipts', label: 'Recibos', icon: Receipt },
   { href: '/dashboard/reports', label: 'Reportes', icon: FileText },
   { href: '/dashboard/validation', label: 'Validación', icon: ShieldCheck },
-  { href: '/dashboard/settings', label: 'Ajustes', icon: Settings }, // Add Settings item
+  { href: '/dashboard/settings', label: 'Ajustes', icon: Settings },
 ];
 
 function AppLogo() {
@@ -49,12 +49,12 @@ function AppLogo() {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const auth = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
-    router.push('/lock');
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
   }
 
   return (
