@@ -5,15 +5,18 @@ import { AppHeader } from '@/components/layout/header';
 import { useAuth as usePinAuth } from '@/lib/auth-provider'; // Renamed to avoid conflict
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FirebaseClientProvider, useAuth as useFirebaseAuth } from '@/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { FirebaseClientProvider, initializeFirebase } from '@/firebase';
+import { signInAnonymously, getAuth } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Initialize Firebase once
+const { firebaseApp, firestore } = initializeFirebase();
+const auth = getAuth(firebaseApp);
+
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = usePinAuth();
   const router = useRouter();
-  const auth = useFirebaseAuth(); // Get the Firebase auth instance
-  const [isFirebaseAuthenticated, setIsFirebaseAuthenticated] = useState(false);
 
   useEffect(() => {
     // If the user is not authenticated with the PIN, redirect to lock screen
@@ -21,20 +24,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       router.push('/lock');
     }
   }, [isAuthenticated, router]);
-
+  
   useEffect(() => {
-    // Ensure there is an anonymous Firebase user for Firestore rules
-    if (auth.currentUser) {
-      setIsFirebaseAuthenticated(true);
-    } else {
-      signInAnonymously(auth)
-        .then(() => setIsFirebaseAuthenticated(true))
-        .catch((error) => console.error("Anonymous sign-in failed:", error));
+    // Ensure there is an anonymous Firebase user for Firestore rules, run in background
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch((error) => console.error("Anonymous sign-in failed:", error));
     }
-  }, [auth]);
+  }, []);
 
-  // While either PIN auth is false or Firebase auth is pending, show a loading skeleton.
-  if (!isAuthenticated || !isFirebaseAuthenticated) {
+
+  // While PIN auth is false, show a loading skeleton.
+  if (!isAuthenticated) {
     return (
        <div className="flex h-screen w-screen">
           <div className="hidden md:block md:w-64 bg-sidebar p-4">
