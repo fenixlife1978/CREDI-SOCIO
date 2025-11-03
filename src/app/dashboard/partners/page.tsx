@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MoreHorizontal, PlusCircle, Upload, Trash2, Search, Pencil, Eye } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, FirestorePermissionError, errorEmitter } from "@/firebase";
 import { collection, query, doc, writeBatch, deleteDoc, getDocs, where } from "firebase/firestore";
 import type { Partner } from "@/lib/data";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -153,49 +153,66 @@ export default function PartnersPage() {
 
   const handleDeleteConfirm = async () => {
     if (!partnerToDelete || !firestore) return;
-    
+  
     try {
       const batch = writeBatch(firestore);
   
-      // 1. Delete the partner document
+      // 1. Mark partner for deletion
       const partnerDocRef = doc(firestore, 'partners', partnerToDelete.id);
-      batch.delete(partnerDocRef);
   
-      // 2. Find and delete all loans associated with the partner
+      // 2. Find associated loans
       const loansQuery = query(collection(firestore, 'loans'), where('partnerId', '==', partnerToDelete.id));
       const loansSnapshot = await getDocs(loansQuery);
+      const loanIds = loansSnapshot.docs.map(d => d.id);
   
-      const loanIds = loansSnapshot.docs.map(doc => doc.id);
-  
-      for (const loanDoc of loansSnapshot.docs) {
-        batch.delete(loanDoc.ref);
-      }
-  
-      // 3. Find and delete all installments associated with those loans
+      // 3. Find associated installments
       if (loanIds.length > 0) {
-        // Firestore 'in' query is limited to 30 items. If there are more loans, we need to batch the installment deletion queries.
         for (let i = 0; i < loanIds.length; i += 30) {
           const chunkOfLoanIds = loanIds.slice(i, i + 30);
           const installmentsQuery = query(collection(firestore, 'installments'), where('loanId', 'in', chunkOfLoanIds));
           const installmentsSnapshot = await getDocs(installmentsQuery);
           installmentsSnapshot.forEach(installmentDoc => {
-            batch.delete(installmentDoc.ref);
+            batch.delete(installmentDoc.ref); // Mark for deletion
           });
         }
       }
+      
+      // Mark loans for deletion
+      for (const loanDoc of loansSnapshot.docs) {
+        batch.delete(loanDoc.ref);
+      }
+      
+      // Mark partner for deletion
+      batch.delete(partnerDocRef);
   
-      await batch.commit();
-  
-      toast({
-        title: "Socio y Datos Eliminados",
-        description: `El socio ${partnerToDelete.firstName} ${partnerToDelete.lastName} y todos sus préstamos y cuotas han sido eliminados.`,
-      });
+      // 4. Commit all deletions in one batch
+      batch.commit()
+        .then(() => {
+          toast({
+            title: "Socio y Datos Eliminados",
+            description: `El socio ${partnerToDelete.firstName} ${partnerToDelete.lastName} y todos sus préstamos y cuotas han sido eliminados.`,
+          });
+        })
+        .catch((serverError) => {
+          console.error("Error deleting partner and associated data: ", serverError);
+          // Emit a contextual error for better debugging.
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: `partners/${partnerToDelete.id}`, // Representative path
+            operation: 'delete',
+          }));
+          toast({
+            title: "Error al eliminar",
+            description: "No se pudo eliminar el socio y sus datos asociados. Inténtalo de nuevo.",
+            variant: "destructive",
+          });
+        });
   
     } catch (error) {
-      console.error("Error deleting partner and associated data: ", error);
+      // This catch block will handle errors from the `getDocs` calls
+      console.error("Error fetching data for deletion: ", error);
       toast({
-        title: "Error al eliminar",
-        description: "No se pudo eliminar el socio y sus datos asociados. Inténtalo de nuevo.",
+        title: "Error de Preparación",
+        description: "No se pudieron obtener los datos necesarios para la eliminación. Revisa tu conexión.",
         variant: "destructive",
       });
     } finally {
