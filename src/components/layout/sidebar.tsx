@@ -22,6 +22,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-provider';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,8 +38,8 @@ const navItems = [
 function AppLogo() {
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
-      <div className="w-10 h-10 flex items-center justify-center bg-sidebar-primary text-sidebar-primary-foreground rounded-md">
-        <Bus />
+      <div className="w-10 h-10 flex items-center justify-center bg-sidebar-primary text-sidebar-primary-foreground rounded-md overflow-hidden">
+        <Image src="https://storage.googleapis.com/studiogpt-function-calling-prod-gemini/452521c0-038c-4f71-a0c3-a9d180ce27c9.png" alt="Logo de la empresa" width={40} height={40} className="object-cover" />
       </div>
       <span className="group-data-[collapsible=icon]:hidden">Asoc. Coop. Transp. La Candelaria R.L.</span>
     </div>
