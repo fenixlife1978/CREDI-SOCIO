@@ -53,7 +53,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   );
 };
 
-export const useFirebase = (): FirebaseServices => {
+export const useFirebase = (): FirebaseServices | { firebaseApp: null; firestore: null; auth: null } => {
   const context = useContext(FirebaseContext);
 
   if (context === undefined) {
@@ -61,9 +61,8 @@ export const useFirebase = (): FirebaseServices => {
   }
 
   if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    // This can happen transiently while auth is initializing.
-    // Components using this should be prepared for this to throw.
-    throw new Error('Firebase core services not available. Check FirebaseProvider props and authentication status.');
+    // Instead of throwing, return null services so components can handle the loading state
+    return { firebaseApp: null, firestore: null, auth: null };
   }
 
   return {
@@ -73,17 +72,17 @@ export const useFirebase = (): FirebaseServices => {
   };
 };
 
-export const useFirestore = (): Firestore => {
+export const useFirestore = (): Firestore | null => {
   const { firestore } = useFirebase();
   return firestore;
 };
 
-export const useAuth = (): Auth => {
+export const useAuth = (): Auth | null => {
   const { auth } = useFirebase();
   return auth;
 };
 
-export const useFirebaseApp = (): FirebaseApp => {
+export const useFirebaseApp = (): FirebaseApp | null => {
   const { firebaseApp } = useFirebase();
   return firebaseApp;
 };

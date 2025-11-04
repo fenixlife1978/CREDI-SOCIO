@@ -1,6 +1,5 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import RegisterAdmin from './register-admin';
 
 export default function SettingsPage() {
 
@@ -12,13 +11,13 @@ export default function SettingsPage() {
 
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Ajustes de la Cuenta</CardTitle>
+          <CardTitle>Ajustes de la Aplicación</CardTitle>
           <CardDescription>
-            Gestiona la configuración de tu cuenta y de otros administradores.
+            Desde aquí podrás gestionar futuras configuraciones del sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RegisterAdmin />
+          <p>Actualmente no hay ajustes disponibles.</p>
         </CardContent>
       </Card>
     </div>

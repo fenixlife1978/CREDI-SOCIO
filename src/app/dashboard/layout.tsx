@@ -2,47 +2,15 @@
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/sidebar';
 import { AppHeader } from '@/components/layout/header';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { FirebaseClientProvider, useUser } from '@/firebase';
-import { Skeleton } from '@/components/ui/skeleton';
-
+import { FirebaseClientProvider } from '@/firebase';
+import { AuthProvider, useAuth } from '@/lib/auth-provider';
+import LockScreen from '@/components/layout/lock-screen';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useUser();
-  const router = useRouter();
+  const { isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    // If loading is finished and there's no user, redirect to login
-    if (!isLoading && !user) {
-      router.push('/login');
-    }
-  }, [isLoading, user, router]);
-
-
-  // While checking for user, show a loading skeleton.
-  if (isLoading || !user) {
-    return (
-       <div className="flex h-screen w-screen">
-          <div className="hidden md:block md:w-64 bg-sidebar p-4">
-            <Skeleton className="h-10 w-full mb-4" />
-            <div className="space-y-2">
-              {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col">
-            <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
-                <Skeleton className="h-8 w-8 md:hidden" />
-                <div className="w-full flex-1" />
-                <Skeleton className="h-8 w-8 rounded-full" />
-                <Skeleton className="h-8 w-8 rounded-full" />
-            </header>
-            <main className="flex-1 p-4 sm:p-6 bg-background">
-                <Skeleton className="h-full w-full" />
-            </main>
-          </div>
-        </div>
-    );
+  if (!isAuthenticated) {
+    return <LockScreen />;
   }
 
   return (
@@ -58,7 +26,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 export default function DashboardLayout({
   children,
 }: {
@@ -66,7 +33,9 @@ export default function DashboardLayout({
 }) {
   return (
     <FirebaseClientProvider>
-      <DashboardContent>{children}</DashboardContent>
+      <AuthProvider>
+        <DashboardContent>{children}</DashboardContent>
+      </AuthProvider>
     </FirebaseClientProvider>
   );
 }

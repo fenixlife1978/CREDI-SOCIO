@@ -8,13 +8,12 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
   Bus,
   DollarSign,
-  LogOut,
   ShieldCheck,
   FileText,
   Receipt,
@@ -22,8 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/firebase';
-import { signOut } from 'firebase/auth';
+import { useAuth } from '@/lib/auth-provider';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -49,13 +47,7 @@ function AppLogo() {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const auth = useAuth();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push('/login');
-  }
+  const { logout } = useAuth();
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -91,22 +83,6 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <div className='p-2 mt-auto'>
-        <SidebarMenu>
-          <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={handleLogout}
-                icon={<LogOut />}
-                tooltip={{
-                  children: "Cerrar sesión",
-                  className: 'bg-primary text-primary-foreground',
-                }}
-              >
-                <span className="group-data-[collapsible=icon]:hidden">Cerrar sesión</span>
-              </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </div>
     </Sidebar>
   );
 }
