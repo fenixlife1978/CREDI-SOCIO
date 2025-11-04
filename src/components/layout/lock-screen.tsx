@@ -5,8 +5,9 @@ import { useAuth } from '@/lib/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Bus, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 export default function LockScreen() {
   const [pin, setPin] = useState('');
@@ -36,7 +37,7 @@ export default function LockScreen() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
             <div className="mx-auto bg-primary text-primary-foreground p-3 rounded-full w-fit mb-4">
-                <Bus className="h-8 w-8" />
+                <Image src="https://storage.googleapis.com/studiogpt-function-calling-prod-gemini/452521c0-038c-4f71-a0c3-a9d180ce27c9.png" alt="Logo de la empresa" width={40} height={40} className="object-cover" />
             </div>
           <CardTitle>Asoc. Coop. Transp. La Candelaria R.L.</CardTitle>
           <CardDescription>
