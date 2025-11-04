@@ -17,8 +17,6 @@ import { useAuth } from '@/lib/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Loader } from 'lucide-react';
-import RegisterAdmin from './register-admin';
-
 
 const pinSchema = z.object({
   newPin: z.string().min(4, 'El PIN debe tener al menos 4 caracteres.'),
@@ -105,8 +103,6 @@ export default function SettingsPage() {
                 </Form>
             </CardContent>
         </Card>
-
-        <RegisterAdmin />
       </div>
     </div>
   );
