@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -501,24 +502,38 @@ export default function ValidationPage() {
     setFixLogs([]);
     const logs: string[] = [];
     let correctedCount = 0;
-
+  
     try {
       const installmentsQuery = query(collection(firestore, 'installments'), where('status', '==', 'paid'));
       const querySnapshot = await getDocs(installmentsQuery);
-      const batch = writeBatch(firestore);
+      
+      if (querySnapshot.empty) {
+        toast({ title: 'Sin Cambios', description: 'No se encontraron cuotas pagadas para procesar.' });
+        setIsFixingInstallmentDates(false);
+        return;
+      }
 
+      const batch = writeBatch(firestore);
+  
       for (const document of querySnapshot.docs) {
         const installment = document.data() as Installment;
         const installmentId = document.id;
-
+  
         if (installment.paymentDate && typeof installment.paymentDate === 'string' && !installment.paymentDate.includes('T')) {
           try {
-            const parsedDate = parse(installment.paymentDate, 'dd/MM/yyyy', new Date());
+            // Try parsing as dd/MM/yyyy first
+            let parsedDate = parse(installment.paymentDate, 'dd/MM/yyyy', new Date());
+            
+            // If invalid, try ISO without time, which might be the case for `new Date().toISOString().split('T')[0]`
+            if (!isValid(parsedDate)) {
+               parsedDate = parseISO(installment.paymentDate);
+            }
+            
             if (isValid(parsedDate)) {
               const newPaymentDateISO = parsedDate.toISOString();
               const installmentRef = doc(firestore, 'installments', installmentId);
               batch.update(installmentRef, { paymentDate: newPaymentDateISO });
-              logs.push(`ID Cuota: ${installmentId} | Fecha Corregida: ${installment.paymentDate} -> ${newPaymentDateISO}`);
+              logs.push(`ID Cuota: ${installmentId} | Fecha Corregida: ${installment.paymentDate} -> ${format(parsedDate, 'dd/MM/yyyy')}`);
               correctedCount++;
             } else {
               logs.push(`ID Cuota: ${installmentId} | OMITIDO: Formato de fecha '${installment.paymentDate}' no es válido.`);
@@ -528,7 +543,7 @@ export default function ValidationPage() {
           }
         }
       }
-
+  
       if (correctedCount > 0) {
         await batch.commit();
         toast({
@@ -541,9 +556,9 @@ export default function ValidationPage() {
           description: 'No se encontraron cuotas pagadas con formatos de fecha antiguos para corregir.',
         });
       }
-
+  
       setFixLogs(logs.length > 0 ? logs : ["No se encontraron logs para mostrar."]);
-
+  
     } catch (error: any) {
       console.error('Error fixing installment dates:', error);
       toast({

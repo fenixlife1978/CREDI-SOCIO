@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { Payment, Installment, Partner } from '@/lib/data';
-import { getMonth, getYear, parseISO, format } from 'date-fns';
+import { getMonth, getYear, parseISO, format, parse, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -29,6 +29,27 @@ const currencyFormatter = new Intl.NumberFormat('es-CO', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
+
+/**
+ * A robust date parser that handles both ISO strings and DD/MM/YYYY format.
+ * @param dateString The date string to parse.
+ * @returns A Date object or null if invalid.
+ */
+function robustDateParse(dateString: string | undefined | null): Date | null {
+  if (!dateString) return null;
+  // Try parsing as ISO 8601 first (e.g., "2023-11-10T12:00:00.000Z")
+  let date = parseISO(dateString);
+  if (isValid(date)) {
+    return date;
+  }
+  // Fallback to parsing "dd/MM/yyyy"
+  date = parse(dateString, 'dd/MM/yyyy', new Date());
+  if (isValid(date)) {
+    return date;
+  }
+  return null;
+}
+
 
 function ReportSkeleton() {
     return (
@@ -73,8 +94,8 @@ function PaidPaymentsTab() {
     if (!paidInstallments) return { filteredInstallments: [], totals: { capital: 0, interest: 0, total: 0 } };
     
     const filtered = paidInstallments.filter(inst => {
-      if (!inst.paymentDate) return false;
-      const paymentDate = parseISO(inst.paymentDate);
+      const paymentDate = robustDateParse(inst.paymentDate);
+      if (!paymentDate) return false;
       return getMonth(paymentDate) === selectedMonth && getYear(paymentDate) === selectedYear;
     });
 
@@ -86,7 +107,7 @@ function PaidPaymentsTab() {
     }, { capital: 0, interest: 0, total: 0 });
 
     return { 
-      filteredInstallments: filtered.sort((a,b) => parseISO(a.paymentDate!).getTime() - parseISO(b.paymentDate!).getTime()), 
+      filteredInstallments: filtered.sort((a,b) => robustDateParse(a.paymentDate!)!.getTime() - robustDateParse(b.paymentDate!)!.getTime()), 
       totals: calculatedTotals,
     };
   }, [paidInstallments, selectedMonth, selectedYear]);
@@ -140,7 +161,7 @@ function PaidPaymentsTab() {
             {filteredInstallments.map((installment) => (
               <TableRow key={installment.id}>
                 <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || installment.partnerId}</TableCell>
-                <TableCell>{installment.paymentDate ? format(parseISO(installment.paymentDate), 'dd/MM/yyyy') : '-'}</TableCell>
+                <TableCell>{installment.paymentDate ? format(robustDateParse(installment.paymentDate)!, 'dd/MM/yyyy') : '-'}</TableCell>
                 <TableCell>{installment.installmentNumber}</TableCell>
                 <TableCell className="text-right">{currencyFormatter.format(installment.capitalAmount)}</TableCell>
                 <TableCell className="text-right">{currencyFormatter.format(installment.interestAmount)}</TableCell>
@@ -190,7 +211,8 @@ function UnpaidInstallmentsTab() {
     if (!installments) return { filteredInstallments: [], totalUnpaid: 0, totalCapital: 0, totalInterest: 0 };
     
     const filtered = installments.filter(i => {
-      const dueDate = parseISO(i.dueDate);
+      const dueDate = robustDateParse(i.dueDate);
+      if (!dueDate) return false;
       return getMonth(dueDate) === selectedMonth && getYear(dueDate) === selectedYear;
     });
 
@@ -268,7 +290,7 @@ function UnpaidInstallmentsTab() {
             {filteredInstallments.map((installment) => (
               <TableRow key={installment.id}>
                 <TableCell className="font-medium">{partnersMap.get(installment.partnerId) || installment.partnerId}</TableCell>
-                <TableCell>{format(parseISO(installment.dueDate), 'dd/MM/yyyy')}</TableCell>
+                <TableCell>{format(robustDateParse(installment.dueDate)!, 'dd/MM/yyyy')}</TableCell>
                 <TableCell>
                     <Badge variant={installment.status === 'overdue' ? 'destructive' : 'outline'}>
                         {installment.status}
