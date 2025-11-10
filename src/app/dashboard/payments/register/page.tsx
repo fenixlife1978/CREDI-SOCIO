@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -251,10 +252,16 @@ export default function RegisterPaymentPage() {
     for (const inst of installmentsToUpdate) {
       const partner = partners.find(p => p.id === inst.partnerId);
       const originalDueDate = parseISO(inst.dueDate);
+      
       const paymentDate = set(originalDueDate, {
           month: selectedMonth,
           year: selectedYear
-      }).toISOString();
+      });
+      // Ensure the payment date is not in the future. If it is, use today's date.
+      const finalPaymentDate = isBefore(paymentDate, new Date()) ? paymentDate : new Date();
+
+      const paymentDateISO = finalPaymentDate.toISOString();
+
 
       if (!paymentsByLoan[inst.loanId]) {
           const paymentRef = doc(collection(firestore, 'payments'));
@@ -266,7 +273,7 @@ export default function RegisterPaymentPage() {
               totalAmount: 0,
               capitalAmount: 0,
               interestAmount: 0,
-              paymentDate,
+              paymentDate: paymentDateISO,
               partnerName: partnersMap.get(inst.partnerId) || inst.partnerId,
           };
       }
@@ -297,7 +304,7 @@ export default function RegisterPaymentPage() {
       const installmentRef = doc(firestore, 'installments', inst.id);
       batch.update(installmentRef, { 
           status: 'paid', 
-          paymentDate, 
+          paymentDate: paymentDateISO, 
           paymentId: paymentsByLoan[inst.loanId].ref.id,
           receiptId: receiptRef.id,
       });
@@ -580,3 +587,4 @@ export default function RegisterPaymentPage() {
     </>
   );
 }
+
