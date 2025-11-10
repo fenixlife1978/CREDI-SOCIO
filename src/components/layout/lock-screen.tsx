@@ -11,7 +11,7 @@ import Image from 'next/image';
 
 export default function LockScreen() {
   const [pin, setPin] = useState('');
-  const { login } = useAuth();
+  const { login, logoUrl } = useAuth();
   const { toast } = useToast();
 
   const handleLogin = () => {
@@ -36,8 +36,12 @@ export default function LockScreen() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-            <div className="mx-auto bg-primary text-primary-foreground p-3 rounded-full w-fit mb-4">
-                <Bus className="h-10 w-10" />
+            <div className="mx-auto bg-primary text-primary-foreground p-3 rounded-full w-fit mb-4 flex items-center justify-center h-20 w-20">
+               {logoUrl ? (
+                    <Image src={logoUrl} alt="Company Logo" width={80} height={80} className="object-cover rounded-full" />
+                ) : (
+                    <Bus className="h-10 w-10" />
+                )}
             </div>
           <CardTitle>Asoc. Coop. Transp. La Candelaria R.L.</CardTitle>
           <CardDescription>

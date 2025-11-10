@@ -15,8 +15,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/auth-provider';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
-import { Loader } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Loader, Upload, Trash2 } from 'lucide-react';
+import Image from 'next/image';
 
 const pinSchema = z.object({
   newPin: z.string().min(4, 'El PIN debe tener al menos 4 caracteres.'),
@@ -29,9 +30,10 @@ const pinSchema = z.object({
 type PinFormData = z.infer<typeof pinSchema>;
 
 export default function SettingsPage() {
-  const { changePin } = useAuth();
+  const { changePin, logoUrl, setLogoUrl, removeLogo } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<PinFormData>({
     resolver: zodResolver(pinSchema),
@@ -51,6 +53,45 @@ export default function SettingsPage() {
     form.reset();
     setIsSubmitting(false);
   };
+
+  const handleLogoUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({
+            title: 'Archivo demasiado grande',
+            description: 'Por favor, selecciona una imagen de menos de 2MB.',
+            variant: 'destructive',
+        });
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') {
+        setLogoUrl(result);
+        toast({
+          title: '¡Logo actualizado!',
+          description: 'El nuevo logo ha sido guardado.',
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    removeLogo();
+    toast({
+      title: 'Logo eliminado',
+      description: 'Se ha restaurado el logo predeterminado.',
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,6 +143,41 @@ export default function SettingsPage() {
                     </form>
                 </Form>
             </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Logo de la Empresa</CardTitle>
+            <CardDescription>Sube y gestiona el logo de la cooperativa.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center gap-4">
+            <div className="w-24 h-24 rounded-full border border-dashed flex items-center justify-center bg-muted overflow-hidden">
+              {logoUrl ? (
+                <Image src={logoUrl} alt="Logo de la empresa" width={96} height={96} className="object-cover" />
+              ) : (
+                <span className="text-xs text-muted-foreground text-center">Sin logo</span>
+              )}
+            </div>
+             <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept="image/png, image/jpeg, image/jpg"
+            />
+            <div className="flex gap-2">
+                 <Button onClick={handleLogoUploadClick}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Subir Logo
+                </Button>
+                {logoUrl && (
+                    <Button variant="destructive" onClick={handleRemoveLogo}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar Logo
+                    </Button>
+                )}
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

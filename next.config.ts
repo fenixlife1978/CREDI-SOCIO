@@ -26,19 +26,20 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'encrypted-tbn0.gstatic.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'www.shutterstock.com',
-        port: '',
-        pathname: '/**',
-      }
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+        ],
+      },
+    ];
   },
   allowedDevOrigins: [
     'https://3001-firebase-studio-1761646698145.cluster-hkcruqmgzbd2aqcdnktmz6k7ba.cloudworkstations.dev'

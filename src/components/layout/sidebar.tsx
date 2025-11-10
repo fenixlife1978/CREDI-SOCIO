@@ -24,6 +24,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-provider';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,10 +38,15 @@ const navItems = [
 ];
 
 function AppLogo() {
+  const { logoUrl } = useAuth();
   return (
     <div className="flex items-center gap-2 font-semibold text-lg text-sidebar-primary">
       <div className="w-10 h-10 flex items-center justify-center bg-sidebar-primary text-sidebar-primary-foreground rounded-md overflow-hidden">
-        <Bus className="h-6 w-6" />
+        {logoUrl ? (
+            <Image src={logoUrl} alt="Company Logo" width={40} height={40} className="object-cover" />
+        ) : (
+            <Bus className="h-6 w-6" />
+        )}
       </div>
       <span className="group-data-[collapsible=icon]:hidden">Asoc. Coop. Transp. La Candelaria R.L.</span>
     </div>
