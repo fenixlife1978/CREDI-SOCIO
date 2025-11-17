@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --starbucks-green: #00754a;
+  --starbucks-light-green: #1e3932;
+  --starbucks-cream: #f3f1e7;
+  --starbucks-brown: #b3764c;
+  --starbucks-black: #212121;
+  --starbucks-white: #ffffff;
+}
+
+body {
+  background: var(--starbucks-cream);
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+}
